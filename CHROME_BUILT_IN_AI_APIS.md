@@ -1056,9 +1056,38 @@ async function smartTranslate(text) {
 - [Chrome AI Blog](https://developer.chrome.com/blog/ai)
 
 ### Demo Projects
-- [Web AI Demos](https://github.com/GoogleChromeLabs/web-ai-demos)
-- [Writer/Rewriter Playground](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/writer-rewriter-api-playground)
-- [Chrome Extension Samples](https://github.com/GoogleChrome/chrome-extensions-samples/tree/main/api-samples)
+
+#### GoogleChromeLabs/web-ai-demos
+Main repository: [https://github.com/GoogleChromeLabs/web-ai-demos](https://github.com/GoogleChromeLabs/web-ai-demos)
+
+Individual demos:
+- **Writer/Rewriter Playground**: Interactive playground for Writer and Rewriter APIs
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/writer-rewriter-api-playground](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/writer-rewriter-api-playground)
+
+- **Prompt API Playground**: Showcases Chrome's built-in Prompt API
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/prompt-api-playground](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/prompt-api-playground)
+
+- **Summarization API Playground**: Demo of the Summarization API
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/summarization-api-playground](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/summarization-api-playground)
+
+- **Weather AI**: Uses Prompt API to generate human-readable weather descriptions
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/weather-ai](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/weather-ai)
+
+- **Right Click for Superpowers**: Context menu integration with LLM for common tasks
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/right-click-for-superpowers](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/right-click-for-superpowers)
+
+- **Product Review Suggestions**: Client-side sentiment analysis, toxicity, and rating assessment
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/product-review-suggestions](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/product-review-suggestions)
+
+- **Gemini Node SSE**: Server-Sent Events streaming with Gemini
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/gemini-node-sse](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/gemini-node-sse)
+
+- **Performance Tips with Web Worker**: Client-side Gen AI performance/UX best practices
+  [https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/perf-worker-gemma](https://github.com/GoogleChromeLabs/web-ai-demos/tree/main/perf-worker-gemma)
+
+#### Chrome Extension Samples
+- **API Samples**: Official Chrome extension examples including AI APIs
+  [https://github.com/GoogleChrome/chrome-extensions-samples/tree/main/api-samples](https://github.com/GoogleChrome/chrome-extensions-samples/tree/main/api-samples)
 
 ### Community
 - [Chrome AI Challenge 2025](https://googlechromeai2025.devpost.com/)
