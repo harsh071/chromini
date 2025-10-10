@@ -104,6 +104,7 @@ async function initWriter(taskType) {
       tone: config.tone,
       format: 'plain-text',
       length: config.length,
+      outputLanguage: 'en',
       monitor(m) {
         m.addEventListener('downloadprogress', (e) => {
           const percent = Math.round(e.loaded * 100);
@@ -184,7 +185,6 @@ function showLoadingUI(message) {
   // Add event listeners
   loadingDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     loadingDiv.remove();
-    showChatButton();
   });
 
   loadingDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
@@ -231,7 +231,6 @@ function showResultUI(content) {
   // Add event listeners
   resultDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     resultDiv.remove();
-    showChatButton();
   });
 
   resultDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
@@ -279,7 +278,6 @@ function showError(message) {
   // Add event listeners
   errorDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     errorDiv.remove();
-    showChatButton();
   });
 
   errorDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
@@ -291,10 +289,9 @@ function showError(message) {
 }
 
 function removeExistingUI() {
-  const existing = document.querySelector('.ai-writer-ui');
-  if (existing) {
-    existing.remove();
-  }
+  // Remove all UIs except the chat
+  const existing = document.querySelectorAll('.ai-writer-ui:not(#ai-writer-chat)');
+  existing.forEach(el => el.remove());
 }
 
 // Show custom prompt input dialog
@@ -334,7 +331,6 @@ function showCustomPromptDialog(text) {
   // Event listeners
   closeBtn.addEventListener('click', () => {
     dialogDiv.remove();
-    showChatButton();
   });
 
   minimizeBtn.addEventListener('click', () => {
@@ -343,7 +339,6 @@ function showCustomPromptDialog(text) {
 
   cancelBtn.addEventListener('click', () => {
     dialogDiv.remove();
-    showChatButton();
   });
 
   submitBtn.addEventListener('click', () => {
@@ -381,21 +376,20 @@ function toggleMinimize(element) {
 
 // Floating chat button
 function showChatButton() {
-  // Don't show if there's already a UI or button
-  if (document.querySelector('.ai-writer-ui') || document.querySelector('.ai-chat-fab')) {
+  // Don't show if button already exists
+  if (document.querySelector('.ai-chat-fab')) {
     return;
   }
 
   const fab = document.createElement('button');
   fab.className = 'ai-chat-fab';
   fab.innerHTML = '💬';
-  fab.title = 'Open AI Chat';
+  fab.title = 'Open AI Chat (Ctrl+Shift+Space)';
 
   document.body.appendChild(fab);
 
   fab.addEventListener('click', () => {
-    fab.remove();
-    showChatUI();
+    toggleChatUI();
   });
 }
 
@@ -406,26 +400,54 @@ function hideChatButton() {
   }
 }
 
+// Toggle chat UI visibility
+function toggleChatUI() {
+  const existingChat = document.getElementById('ai-writer-chat');
+
+  if (existingChat) {
+    // If chat exists, toggle its visibility
+    if (existingChat.classList.contains('hidden')) {
+      existingChat.classList.remove('hidden');
+      const input = existingChat.querySelector('.ai-writer-chat-input');
+      setTimeout(() => input?.focus(), 100);
+    } else {
+      existingChat.classList.add('hidden');
+    }
+  } else {
+    // Create new chat UI
+    showChatUI();
+  }
+}
+
 // Show chat UI for general conversation
 function showChatUI() {
-  removeExistingUI();
+  // Remove other UIs but keep the chat if it exists
+  const existingModals = document.querySelectorAll('.ai-writer-ui:not(#ai-writer-chat)');
+  existingModals.forEach(modal => modal.remove());
 
   const chatDiv = document.createElement('div');
   chatDiv.id = 'ai-writer-chat';
-  chatDiv.className = 'ai-writer-ui';
+  chatDiv.className = 'ai-writer-ui ai-chat-dropdown';
   chatDiv.innerHTML = `
     <div class="ai-writer-header">
-      <span>AI Chat Assistant</span>
+      <span>💬 AI Chat Assistant</span>
       <div class="ai-writer-header-controls">
-        <button class="ai-writer-minimize">−</button>
         <button class="ai-writer-close">×</button>
       </div>
     </div>
     <div class="ai-writer-content">
-      <div class="ai-writer-chat-messages" id="chat-messages"></div>
-      <textarea class="ai-writer-chat-input" placeholder="Ask me anything..." rows="3"></textarea>
-      <div class="ai-writer-actions">
-        <button class="ai-writer-btn ai-writer-submit">Send</button>
+      <div class="ai-writer-chat-messages" id="chat-messages">
+        <div class="ai-writer-chat-welcome">
+          👋 Hi! Ask me anything or use the context menu on selected text for specific tasks.
+        </div>
+      </div>
+      <div class="ai-writer-chat-input-container">
+        <textarea class="ai-writer-chat-input" placeholder="Ask me anything..." rows="2"></textarea>
+        <button class="ai-writer-send-btn" title="Send (Enter)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+        </button>
       </div>
     </div>
   `;
@@ -433,21 +455,15 @@ function showChatUI() {
   document.body.appendChild(chatDiv);
 
   const input = chatDiv.querySelector('.ai-writer-chat-input');
-  const submitBtn = chatDiv.querySelector('.ai-writer-submit');
+  const sendBtn = chatDiv.querySelector('.ai-writer-send-btn');
   const closeBtn = chatDiv.querySelector('.ai-writer-close');
-  const minimizeBtn = chatDiv.querySelector('.ai-writer-minimize');
 
   // Event listeners
   closeBtn.addEventListener('click', () => {
-    chatDiv.remove();
-    showChatButton();
+    chatDiv.classList.add('hidden');
   });
 
-  minimizeBtn.addEventListener('click', () => {
-    toggleMinimize(chatDiv);
-  });
-
-  submitBtn.addEventListener('click', () => {
+  sendBtn.addEventListener('click', () => {
     const message = input.value.trim();
     if (message) {
       sendChatMessage(message);
@@ -459,19 +475,15 @@ function showChatUI() {
   input.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      submitBtn.click();
+      sendBtn.click();
     }
   });
 
   // Auto-resize textarea
   input.addEventListener('input', () => {
     input.style.height = 'auto';
-    input.style.height = input.scrollHeight + 'px';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
   });
-
-  // Make modal draggable and resizable
-  makeDraggable(chatDiv);
-  makeResizable(chatDiv);
 
   // Focus input
   setTimeout(() => input.focus(), 100);
@@ -480,6 +492,12 @@ function showChatUI() {
 // Send chat message
 async function sendChatMessage(message) {
   const messagesContainer = document.getElementById('chat-messages');
+
+  // Remove welcome message on first chat
+  const welcomeMsg = messagesContainer.querySelector('.ai-writer-chat-welcome');
+  if (welcomeMsg) {
+    welcomeMsg.remove();
+  }
 
   // Add user message
   const userMsg = document.createElement('div');
@@ -694,6 +712,14 @@ function regenerateContent() {
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.ai-writer-ui')) {
     lastActiveElement = document.activeElement;
+  }
+});
+
+// Keyboard shortcut: Ctrl+Shift+Space (or Cmd+Shift+Space on Mac)
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space') {
+    e.preventDefault();
+    toggleChatUI();
   }
 });
 
