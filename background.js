@@ -8,7 +8,73 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['selection']
   });
 
-  // Create submenu items for different writing tasks
+  // Text transformation options
+  chrome.contextMenus.create({
+    id: 'write-rephrase',
+    parentId: 'ai-writer-menu',
+    title: '✏️ Rephrase',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'write-shorten',
+    parentId: 'ai-writer-menu',
+    title: '↕️ Shorten',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'ai-writer-separator-1',
+    parentId: 'ai-writer-menu',
+    type: 'separator',
+    contexts: ['selection']
+  });
+
+  // Tone adjustments
+  chrome.contextMenus.create({
+    id: 'write-formal',
+    parentId: 'ai-writer-menu',
+    title: '💼 More formal',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'write-casual',
+    parentId: 'ai-writer-menu',
+    title: '🎨 More casual',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'ai-writer-separator-2',
+    parentId: 'ai-writer-menu',
+    type: 'separator',
+    contexts: ['selection']
+  });
+
+  // Content formatting
+  chrome.contextMenus.create({
+    id: 'write-bulletize',
+    parentId: 'ai-writer-menu',
+    title: '∷ Bulletize',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'write-summarize',
+    parentId: 'ai-writer-menu',
+    title: '📋 Summarize',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'ai-writer-separator-3',
+    parentId: 'ai-writer-menu',
+    type: 'separator',
+    contexts: ['selection']
+  });
+
+  // Original writing tasks
   chrome.contextMenus.create({
     id: 'write-cover-letter',
     parentId: 'ai-writer-menu',
