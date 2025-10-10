@@ -355,13 +355,17 @@ function makeDraggable(element) {
     if (e.target.classList.contains('ai-writer-close')) return;
 
     isDragging = true;
-    initialX = e.clientX - element.offsetLeft;
-    initialY = e.clientY - element.offsetTop;
 
-    // Remove transform to allow absolute positioning
-    element.style.transform = 'none';
-    element.style.left = element.offsetLeft + 'px';
-    element.style.top = element.offsetTop + 'px';
+    // Get current position
+    const rect = element.getBoundingClientRect();
+    initialX = e.clientX - rect.left;
+    initialY = e.clientY - rect.top;
+
+    // Switch to absolute positioning
+    element.style.bottom = 'auto';
+    element.style.right = 'auto';
+    element.style.left = rect.left + 'px';
+    element.style.top = rect.top + 'px';
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -370,6 +374,13 @@ function makeDraggable(element) {
     e.preventDefault();
     currentX = e.clientX - initialX;
     currentY = e.clientY - initialY;
+
+    // Constrain to viewport
+    const maxX = window.innerWidth - element.offsetWidth;
+    const maxY = window.innerHeight - element.offsetHeight;
+
+    currentX = Math.max(0, Math.min(currentX, maxX));
+    currentY = Math.max(0, Math.min(currentY, maxY));
 
     element.style.left = currentX + 'px';
     element.style.top = currentY + 'px';
