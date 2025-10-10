@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#grad1)"/>
+
+  <!-- Pen icon -->
+  <path d="M45 75L35 93L53 83L85 51C87 49 87 46 85 44L84 43C82 41 79 41 77 43L45 75Z" fill="white"/>
+  <path d="M87 41L90 44C92 46 92 49 90 51L88 53L75 40L77 38C79 36 82 36 84 38L87 41Z" fill="white" opacity="0.8"/>
+
+  <!-- AI sparkles -->
+  <circle cx="95" cy="25" r="3" fill="white"/>
+  <circle cx="105" cy="35" r="2" fill="white" opacity="0.7"/>
+  <circle cx="100" cy="45" r="2.5" fill="white" opacity="0.8"/>
+
+  <!-- Lines representing text -->
+  <rect x="40" y="95" width="35" height="3" rx="1.5" fill="white" opacity="0.6"/>
+  <rect x="40" y="102" width="28" height="3" rx="1.5" fill="white" opacity="0.5"/>
+</svg>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Writing Assistant</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 350px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
+
+    .status-card {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .status-info {
+      font-size: 13px;
+      opacity: 0.9;
+      line-height: 1.5;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-indicator.available {
+      background: #10b981;
+    }
+
+    .status-indicator.unavailable {
+      background: #ef4444;
+    }
+
+    .status-indicator.checking {
+      background: #f59e0b;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .instructions {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .instructions h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .instructions ol {
+      font-size: 13px;
+      padding-left: 20px;
+      line-height: 1.6;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    .features {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .features h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .feature-item {
+      font-size: 13px;
+      margin-bottom: 8px;
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .feature-item::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      font-weight: bold;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.8;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .footer a {
+      color: white;
+      text-decoration: underline;
+    }
+
+    .btn {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+      transition: transform 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Writing Assistant</h1>
+    <p class="subtitle">Powered by Chrome's Built-in Writer API</p>
+
+    <div class="status-card">
+      <div class="status-title">
+        <span class="status-indicator checking" id="statusIndicator"></span>
+        <span id="statusText">Checking API availability...</span>
+      </div>
+      <div class="status-info" id="statusInfo">
+        Please wait while we check if the Writer API is available on your system.
+      </div>
+      <button class="btn" id="recheckBtn" style="display: none;">Recheck API Status</button>
+    </div>
+
+    <div class="instructions">
+      <h3>How to Use</h3>
+      <ol>
+        <li>Highlight any text on a webpage</li>
+        <li>Right-click to open the context menu</li>
+        <li>Select "AI Writing Assistant"</li>
+        <li>Choose your writing task (cover letter, email, etc.)</li>
+        <li>View and edit the AI-generated content</li>
+      </ol>
+    </div>
+
+    <div class="features">
+      <h3>Available Writing Tasks</h3>
+      <div class="feature-item">Draft Cover Letter</div>
+      <div class="feature-item">Draft Proposal</div>
+      <div class="feature-item">Draft Email</div>
+      <div class="feature-item">Draft Social Post</div>
+      <div class="feature-item">Custom Writing Task</div>
+    </div>
+
+    <div class="footer">
+      <p>Requires Chrome 137+ and Writer API enabled</p>
+      <p><a href="https://developer.chrome.com/docs/ai/built-in" target="_blank">Learn more about Chrome's Built-in AI</a></p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
