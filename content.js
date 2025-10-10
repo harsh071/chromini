@@ -168,7 +168,10 @@ function showLoadingUI(message) {
   loadingDiv.innerHTML = `
     <div class="ai-writer-header">
       <span>AI Writing Assistant</span>
-      <button class="ai-writer-close">×</button>
+      <div class="ai-writer-header-controls">
+        <button class="ai-writer-minimize">−</button>
+        <button class="ai-writer-close">×</button>
+      </div>
     </div>
     <div class="ai-writer-content">
       <div class="ai-writer-spinner"></div>
@@ -178,9 +181,14 @@ function showLoadingUI(message) {
 
   document.body.appendChild(loadingDiv);
 
-  // Add close button event listener
+  // Add event listeners
   loadingDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     loadingDiv.remove();
+    showChatButton();
+  });
+
+  loadingDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
+    toggleMinimize(loadingDiv);
   });
 
   // Make modal draggable
@@ -203,7 +211,10 @@ function showResultUI(content) {
   resultDiv.innerHTML = `
     <div class="ai-writer-header">
       <span>AI Generated Content</span>
-      <button class="ai-writer-close">×</button>
+      <div class="ai-writer-header-controls">
+        <button class="ai-writer-minimize">−</button>
+        <button class="ai-writer-close">×</button>
+      </div>
     </div>
     <div class="ai-writer-content">
       <div class="ai-writer-result-text" contenteditable="true">${content}</div>
@@ -220,7 +231,13 @@ function showResultUI(content) {
   // Add event listeners
   resultDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     resultDiv.remove();
+    showChatButton();
   });
+
+  resultDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
+    toggleMinimize(resultDiv);
+  });
+
   resultDiv.querySelector('.ai-writer-copy').addEventListener('click', copyToClipboard);
   resultDiv.querySelector('.ai-writer-insert').addEventListener('click', insertText);
   resultDiv.querySelector('.ai-writer-regenerate').addEventListener('click', regenerateContent);
@@ -246,7 +263,10 @@ function showError(message) {
   errorDiv.innerHTML = `
     <div class="ai-writer-header">
       <span>AI Writing Assistant - Error</span>
-      <button class="ai-writer-close">×</button>
+      <div class="ai-writer-header-controls">
+        <button class="ai-writer-minimize">−</button>
+        <button class="ai-writer-close">×</button>
+      </div>
     </div>
     <div class="ai-writer-content">
       <p>${message}</p>
@@ -256,9 +276,14 @@ function showError(message) {
 
   document.body.appendChild(errorDiv);
 
-  // Add close button event listener
+  // Add event listeners
   errorDiv.querySelector('.ai-writer-close').addEventListener('click', () => {
     errorDiv.remove();
+    showChatButton();
+  });
+
+  errorDiv.querySelector('.ai-writer-minimize').addEventListener('click', () => {
+    toggleMinimize(errorDiv);
   });
 
   // Make modal draggable
@@ -282,7 +307,10 @@ function showCustomPromptDialog(text) {
   dialogDiv.innerHTML = `
     <div class="ai-writer-header">
       <span>Custom Writing Task</span>
-      <button class="ai-writer-close">×</button>
+      <div class="ai-writer-header-controls">
+        <button class="ai-writer-minimize">−</button>
+        <button class="ai-writer-close">×</button>
+      </div>
     </div>
     <div class="ai-writer-content">
       <label for="custom-prompt-input" class="ai-writer-label">Enter your custom prompt:</label>
@@ -301,14 +329,21 @@ function showCustomPromptDialog(text) {
   const submitBtn = dialogDiv.querySelector('.ai-writer-submit');
   const cancelBtn = dialogDiv.querySelector('.ai-writer-cancel');
   const closeBtn = dialogDiv.querySelector('.ai-writer-close');
+  const minimizeBtn = dialogDiv.querySelector('.ai-writer-minimize');
 
   // Event listeners
   closeBtn.addEventListener('click', () => {
     dialogDiv.remove();
+    showChatButton();
+  });
+
+  minimizeBtn.addEventListener('click', () => {
+    toggleMinimize(dialogDiv);
   });
 
   cancelBtn.addEventListener('click', () => {
     dialogDiv.remove();
+    showChatButton();
   });
 
   submitBtn.addEventListener('click', () => {
@@ -339,6 +374,156 @@ function showCustomPromptDialog(text) {
   setTimeout(() => input.focus(), 100);
 }
 
+// Toggle minimize/maximize
+function toggleMinimize(element) {
+  element.classList.toggle('minimized');
+}
+
+// Floating chat button
+function showChatButton() {
+  // Don't show if there's already a UI or button
+  if (document.querySelector('.ai-writer-ui') || document.querySelector('.ai-chat-fab')) {
+    return;
+  }
+
+  const fab = document.createElement('button');
+  fab.className = 'ai-chat-fab';
+  fab.innerHTML = '💬';
+  fab.title = 'Open AI Chat';
+
+  document.body.appendChild(fab);
+
+  fab.addEventListener('click', () => {
+    fab.remove();
+    showChatUI();
+  });
+}
+
+function hideChatButton() {
+  const fab = document.querySelector('.ai-chat-fab');
+  if (fab) {
+    fab.remove();
+  }
+}
+
+// Show chat UI for general conversation
+function showChatUI() {
+  removeExistingUI();
+
+  const chatDiv = document.createElement('div');
+  chatDiv.id = 'ai-writer-chat';
+  chatDiv.className = 'ai-writer-ui';
+  chatDiv.innerHTML = `
+    <div class="ai-writer-header">
+      <span>AI Chat Assistant</span>
+      <div class="ai-writer-header-controls">
+        <button class="ai-writer-minimize">−</button>
+        <button class="ai-writer-close">×</button>
+      </div>
+    </div>
+    <div class="ai-writer-content">
+      <div class="ai-writer-chat-messages" id="chat-messages"></div>
+      <textarea class="ai-writer-chat-input" placeholder="Ask me anything..." rows="3"></textarea>
+      <div class="ai-writer-actions">
+        <button class="ai-writer-btn ai-writer-submit">Send</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(chatDiv);
+
+  const input = chatDiv.querySelector('.ai-writer-chat-input');
+  const submitBtn = chatDiv.querySelector('.ai-writer-submit');
+  const closeBtn = chatDiv.querySelector('.ai-writer-close');
+  const minimizeBtn = chatDiv.querySelector('.ai-writer-minimize');
+
+  // Event listeners
+  closeBtn.addEventListener('click', () => {
+    chatDiv.remove();
+    showChatButton();
+  });
+
+  minimizeBtn.addEventListener('click', () => {
+    toggleMinimize(chatDiv);
+  });
+
+  submitBtn.addEventListener('click', () => {
+    const message = input.value.trim();
+    if (message) {
+      sendChatMessage(message);
+      input.value = '';
+      input.style.height = 'auto';
+    }
+  });
+
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitBtn.click();
+    }
+  });
+
+  // Auto-resize textarea
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+  });
+
+  // Make modal draggable and resizable
+  makeDraggable(chatDiv);
+  makeResizable(chatDiv);
+
+  // Focus input
+  setTimeout(() => input.focus(), 100);
+}
+
+// Send chat message
+async function sendChatMessage(message) {
+  const messagesContainer = document.getElementById('chat-messages');
+
+  // Add user message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'ai-writer-chat-message user';
+  userMsg.textContent = message;
+  messagesContainer.appendChild(userMsg);
+
+  // Scroll to bottom
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+  // Check if writer is available
+  const available = await checkWriterAvailability();
+  if (!available) {
+    showError('Writer API is not available on this device. Please check system requirements.');
+    return;
+  }
+
+  // Initialize writer if needed
+  if (!writerInstance) {
+    await initWriter('custom');
+  }
+
+  // Add assistant message placeholder
+  const assistantMsg = document.createElement('div');
+  assistantMsg.className = 'ai-writer-chat-message assistant';
+  assistantMsg.textContent = '';
+  messagesContainer.appendChild(assistantMsg);
+
+  try {
+    // Stream the response
+    const stream = writerInstance.writeStreaming(message);
+    let result = '';
+
+    for await (const chunk of stream) {
+      result += chunk;
+      assistantMsg.textContent = result;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  } catch (error) {
+    assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
+    assistantMsg.style.color = '#ef4444';
+  }
+}
+
 // Make modal draggable
 function makeDraggable(element) {
   const header = element.querySelector('.ai-writer-header');
@@ -351,8 +536,10 @@ function makeDraggable(element) {
   header.style.cursor = 'move';
 
   header.addEventListener('mousedown', (e) => {
-    // Don't drag when clicking the close button
-    if (e.target.classList.contains('ai-writer-close')) return;
+    // Don't drag when clicking buttons
+    if (e.target.classList.contains('ai-writer-close') ||
+        e.target.classList.contains('ai-writer-minimize') ||
+        e.target.closest('.ai-writer-header-controls')) return;
 
     isDragging = true;
 
@@ -484,9 +671,12 @@ function insertText() {
       insertBtn.textContent = originalText;
     }, 2000);
 
-    // Close the modal
+    // Minimize the modal instead of closing
     setTimeout(() => {
-      document.querySelector('.ai-writer-ui')?.remove();
+      const modal = document.querySelector('.ai-writer-ui');
+      if (modal) {
+        toggleMinimize(modal);
+      }
     }, 1000);
   }
 }
@@ -533,6 +723,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 checkWriterAvailability().then(available => {
   isWriterAvailable = available;
   console.log('AI Writing Assistant loaded. Writer API available:', available);
+
+  // Show floating chat button on page load
+  setTimeout(() => {
+    showChatButton();
+  }, 1000);
 });
 
 // Cleanup on page unload
