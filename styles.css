@@ -729,6 +729,22 @@
   flex-shrink: 0;
 }
 
+/* Loading message */
+.ai-writer-chat-message.loading-message {
+  font-style: italic;
+  opacity: 0.7;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
 .ai-writer-chat-input-container {
   display: flex;
   gap: 12px;

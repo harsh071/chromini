@@ -49,7 +49,17 @@ async function initWriter(taskType) {
   try {
     const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
 
-    showLoadingUI('Initializing AI Writer...');
+    // Show loading indicator in the chat if it exists
+    const messagesContainer = document.getElementById('chat-messages');
+    let loadingMsg = null;
+
+    if (messagesContainer) {
+      loadingMsg = document.createElement('div');
+      loadingMsg.className = 'ai-writer-chat-message assistant loading-message';
+      loadingMsg.textContent = 'Initializing AI Writer...';
+      messagesContainer.appendChild(loadingMsg);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 
     writerInstance = await self.Writer.create({
       sharedContext: config.sharedContext,
@@ -60,15 +70,33 @@ async function initWriter(taskType) {
       monitor(m) {
         m.addEventListener('downloadprogress', (e) => {
           const percent = Math.round(e.loaded * 100);
-          updateLoadingProgress(`Downloading AI model: ${percent}%`);
+          if (loadingMsg) {
+            loadingMsg.textContent = `Downloading AI model: ${percent}%`;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
         });
       }
     });
 
+    // Remove loading message after initialization
+    if (loadingMsg) {
+      loadingMsg.remove();
+    }
+
     return writerInstance;
   } catch (error) {
     console.error('Error initializing Writer:', error);
-    showError('Failed to initialize AI Writer: ' + error.message);
+
+    // Show error in chat if available
+    const messagesContainer = document.getElementById('chat-messages');
+    if (messagesContainer) {
+      const errorMsg = document.createElement('div');
+      errorMsg.className = 'ai-writer-chat-message assistant';
+      errorMsg.textContent = 'Failed to initialize AI Writer: ' + error.message;
+      errorMsg.style.color = '#ef4444';
+      messagesContainer.appendChild(errorMsg);
+    }
+
     return null;
   }
 }
