@@ -12,59 +12,11 @@ const TASK_CONFIGS = {
     length: 'medium',
     sharedContext: 'Text rephrasing'
   },
-  'shorten': {
-    prompt: 'Shorten the following text while keeping the key points: ',
-    tone: 'neutral',
-    length: 'short',
-    sharedContext: 'Text shortening'
-  },
-  'formal': {
-    prompt: 'Rewrite the following text in a more formal tone: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Formal tone adjustment'
-  },
-  'casual': {
-    prompt: 'Rewrite the following text in a more casual tone: ',
-    tone: 'casual',
-    length: 'medium',
-    sharedContext: 'Casual tone adjustment'
-  },
-  'bulletize': {
-    prompt: 'Convert the following text into bullet points: ',
-    tone: 'neutral',
-    length: 'medium',
-    sharedContext: 'Bullet point formatting'
-  },
   'summarize': {
     prompt: 'Summarize the following text: ',
     tone: 'neutral',
     length: 'short',
     sharedContext: 'Text summarization'
-  },
-  'cover-letter': {
-    prompt: 'Write a compelling cover letter based on: ',
-    tone: 'formal',
-    length: 'long',
-    sharedContext: 'Professional job application cover letter'
-  },
-  'proposal': {
-    prompt: 'Write a professional proposal for: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Business proposal document'
-  },
-  'email': {
-    prompt: 'Write a professional email about: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Professional email communication'
-  },
-  'post': {
-    prompt: 'Write an engaging social media post about: ',
-    tone: 'casual',
-    length: 'short',
-    sharedContext: 'Social media content'
   },
   'custom': {
     prompt: 'Write content for: ',
@@ -97,7 +49,17 @@ async function initWriter(taskType) {
   try {
     const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
 
-    showLoadingUI('Initializing AI Writer...');
+    // Show loading indicator in the chat if it exists
+    const messagesContainer = document.getElementById('chat-messages');
+    let loadingMsg = null;
+
+    if (messagesContainer) {
+      loadingMsg = document.createElement('div');
+      loadingMsg.className = 'ai-writer-chat-message assistant loading-message';
+      loadingMsg.textContent = 'Initializing AI Writer...';
+      messagesContainer.appendChild(loadingMsg);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 
     writerInstance = await self.Writer.create({
       sharedContext: config.sharedContext,
@@ -108,15 +70,33 @@ async function initWriter(taskType) {
       monitor(m) {
         m.addEventListener('downloadprogress', (e) => {
           const percent = Math.round(e.loaded * 100);
-          updateLoadingProgress(`Downloading AI model: ${percent}%`);
+          if (loadingMsg) {
+            loadingMsg.textContent = `Downloading AI model: ${percent}%`;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
         });
       }
     });
 
+    // Remove loading message after initialization
+    if (loadingMsg) {
+      loadingMsg.remove();
+    }
+
     return writerInstance;
   } catch (error) {
     console.error('Error initializing Writer:', error);
-    showError('Failed to initialize AI Writer: ' + error.message);
+
+    // Show error in chat if available
+    const messagesContainer = document.getElementById('chat-messages');
+    if (messagesContainer) {
+      const errorMsg = document.createElement('div');
+      errorMsg.className = 'ai-writer-chat-message assistant';
+      errorMsg.textContent = 'Failed to initialize AI Writer: ' + error.message;
+      errorMsg.style.color = '#ef4444';
+      messagesContainer.appendChild(errorMsg);
+    }
+
     return null;
   }
 }
@@ -564,6 +544,164 @@ function showChatUI() {
   setTimeout(() => input.focus(), 100);
 }
 
+// Add action buttons to message
+function addMessageActions(messageWrapper, messageElement) {
+  // Don't add if actions already exist
+  if (messageWrapper.querySelector('.ai-writer-message-actions')) {
+    return;
+  }
+
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'ai-writer-message-actions';
+  actionsDiv.innerHTML = `
+    <button class="ai-writer-message-btn copy-btn" title="Copy to clipboard">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      Copy
+    </button>
+    <button class="ai-writer-message-btn insert-btn" title="Insert at cursor">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Insert
+    </button>
+  `;
+
+  messageWrapper.appendChild(actionsDiv);
+
+  // Add event listeners
+  const copyBtn = actionsDiv.querySelector('.copy-btn');
+  const insertBtn = actionsDiv.querySelector('.insert-btn');
+
+  copyBtn.addEventListener('click', () => {
+    copyMessageToClipboard(messageElement, copyBtn);
+  });
+
+  insertBtn.addEventListener('click', () => {
+    insertMessageText(messageElement, insertBtn);
+  });
+}
+
+// Copy message to clipboard
+function copyMessageToClipboard(messageElement, button) {
+  const text = messageElement.textContent;
+
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      const originalHTML = button.innerHTML;
+      button.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Copied!
+      `;
+      button.style.color = '#10b981';
+
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.style.color = '';
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Failed to copy:', err);
+      button.textContent = 'Failed';
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+      }, 2000);
+    });
+}
+
+// Insert message text at cursor position
+function insertMessageText(messageElement, button) {
+  const text = messageElement.textContent;
+
+  if (!lastActiveElement) {
+    // If no element was tracked, show error
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Click in a text field first`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
+    return;
+  }
+
+  // Check if the element still exists in the DOM
+  if (!document.body.contains(lastActiveElement)) {
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Text field no longer available`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
+    return;
+  }
+
+  try {
+    // Check if the element is an input or textarea
+    if (lastActiveElement.tagName === 'INPUT' || lastActiveElement.tagName === 'TEXTAREA') {
+      // Get current position or use last stored position
+      let start = lastActiveElement.selectionStart ?? lastCursorPosition.start;
+      let end = lastActiveElement.selectionEnd ?? lastCursorPosition.end;
+      const currentValue = lastActiveElement.value;
+
+      // Insert text at cursor position
+      const newValue = currentValue.substring(0, start) + text + currentValue.substring(end);
+      lastActiveElement.value = newValue;
+
+      // Focus and set cursor after inserted text
+      lastActiveElement.focus();
+      const newPosition = start + text.length;
+      lastActiveElement.setSelectionRange(newPosition, newPosition);
+
+      // Trigger input event for frameworks that listen to it
+      lastActiveElement.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    // Check if it's a contenteditable element
+    else if (lastActiveElement.isContentEditable) {
+      lastActiveElement.focus();
+
+      // Try modern approach first
+      if (typeof lastActiveElement.setRangeText === 'function') {
+        lastActiveElement.setRangeText(text);
+      } else {
+        // Fallback to execCommand (deprecated but still works)
+        document.execCommand('insertText', false, text);
+      }
+    }
+
+    // Show success feedback
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      Inserted!
+    `;
+    button.style.color = '#10b981';
+
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to insert text:', error);
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Insert failed`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
+  }
+}
+
 // Send chat message
 async function sendChatMessage(message) {
   const messagesContainer = document.getElementById('chat-messages');
@@ -599,11 +737,16 @@ async function sendChatMessage(message) {
     await initWriter('custom');
   }
 
-  // Add assistant message placeholder
+  // Add assistant message wrapper
+  const messageWrapper = document.createElement('div');
+  messageWrapper.className = 'ai-writer-message-wrapper assistant-wrapper';
+
   const assistantMsg = document.createElement('div');
   assistantMsg.className = 'ai-writer-chat-message assistant';
   assistantMsg.textContent = '';
-  messagesContainer.appendChild(assistantMsg);
+
+  messageWrapper.appendChild(assistantMsg);
+  messagesContainer.appendChild(messageWrapper);
 
   try {
     let finalPrompt = message;
@@ -624,6 +767,9 @@ async function sendChatMessage(message) {
       assistantMsg.textContent = result;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    // Add action buttons after streaming completes
+    addMessageActions(messageWrapper, assistantMsg);
   } catch (error) {
     assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
     assistantMsg.style.color = '#ef4444';
@@ -796,12 +942,40 @@ function regenerateContent() {
   }
 }
 
-// Track the active element before showing the context menu
+// Track the active element and cursor position
+let lastCursorPosition = { start: 0, end: 0 };
+
+// Update tracking when user interacts with input fields
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.ai-writer-ui')) {
     lastActiveElement = document.activeElement;
+    updateCursorPosition();
   }
 });
+
+document.addEventListener('keyup', (e) => {
+  if (!e.target.closest('.ai-writer-ui')) {
+    lastActiveElement = document.activeElement;
+    updateCursorPosition();
+  }
+});
+
+document.addEventListener('focusin', (e) => {
+  if (!e.target.closest('.ai-writer-ui')) {
+    lastActiveElement = e.target;
+    updateCursorPosition();
+  }
+});
+
+// Update cursor position helper
+function updateCursorPosition() {
+  if (lastActiveElement && (lastActiveElement.tagName === 'INPUT' || lastActiveElement.tagName === 'TEXTAREA')) {
+    lastCursorPosition = {
+      start: lastActiveElement.selectionStart || 0,
+      end: lastActiveElement.selectionEnd || 0
+    };
+  }
+}
 
 // Keyboard shortcut: Ctrl+Shift+Space (or Cmd+Shift+Space on Mac)
 document.addEventListener('keydown', (e) => {
@@ -835,16 +1009,8 @@ async function processTaskInChat(text, taskType) {
   const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
   const taskNames = {
     'rephrase': '✏️ Rephrase',
-    'shorten': '↕️ Shorten',
-    'formal': '💼 More formal',
-    'casual': '🎨 More casual',
-    'bulletize': '∷ Bulletize',
     'summarize': '📋 Summarize',
-    'cover-letter': 'Draft Cover Letter',
-    'proposal': 'Draft Proposal',
-    'email': 'Draft Email',
-    'post': 'Draft Social Post',
-    'custom': 'Custom Writing Task'
+    'custom': '✨ Custom Task'
   };
 
   const taskName = taskNames[taskType] || 'Process text';
@@ -890,11 +1056,16 @@ async function processTaskInChat(text, taskType) {
     return;
   }
 
-  // Add assistant message placeholder
+  // Add assistant message wrapper
+  const messageWrapper = document.createElement('div');
+  messageWrapper.className = 'ai-writer-message-wrapper assistant-wrapper';
+
   const assistantMsg = document.createElement('div');
   assistantMsg.className = 'ai-writer-chat-message assistant';
   assistantMsg.textContent = '';
-  messagesContainer.appendChild(assistantMsg);
+
+  messageWrapper.appendChild(assistantMsg);
+  messagesContainer.appendChild(messageWrapper);
 
   // Build the prompt
   const fullPrompt = config.prompt + text;
@@ -909,6 +1080,9 @@ async function processTaskInChat(text, taskType) {
       assistantMsg.textContent = result;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    // Add action buttons after streaming completes
+    addMessageActions(messageWrapper, assistantMsg);
   } catch (error) {
     assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
     assistantMsg.style.color = '#ef4444';
