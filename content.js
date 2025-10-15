@@ -12,59 +12,11 @@ const TASK_CONFIGS = {
     length: 'medium',
     sharedContext: 'Text rephrasing'
   },
-  'shorten': {
-    prompt: 'Shorten the following text while keeping the key points: ',
-    tone: 'neutral',
-    length: 'short',
-    sharedContext: 'Text shortening'
-  },
-  'formal': {
-    prompt: 'Rewrite the following text in a more formal tone: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Formal tone adjustment'
-  },
-  'casual': {
-    prompt: 'Rewrite the following text in a more casual tone: ',
-    tone: 'casual',
-    length: 'medium',
-    sharedContext: 'Casual tone adjustment'
-  },
-  'bulletize': {
-    prompt: 'Convert the following text into bullet points: ',
-    tone: 'neutral',
-    length: 'medium',
-    sharedContext: 'Bullet point formatting'
-  },
   'summarize': {
     prompt: 'Summarize the following text: ',
     tone: 'neutral',
     length: 'short',
     sharedContext: 'Text summarization'
-  },
-  'cover-letter': {
-    prompt: 'Write a compelling cover letter based on: ',
-    tone: 'formal',
-    length: 'long',
-    sharedContext: 'Professional job application cover letter'
-  },
-  'proposal': {
-    prompt: 'Write a professional proposal for: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Business proposal document'
-  },
-  'email': {
-    prompt: 'Write a professional email about: ',
-    tone: 'formal',
-    length: 'medium',
-    sharedContext: 'Professional email communication'
-  },
-  'post': {
-    prompt: 'Write an engaging social media post about: ',
-    tone: 'casual',
-    length: 'short',
-    sharedContext: 'Social media content'
   },
   'custom': {
     prompt: 'Write content for: ',
@@ -835,16 +787,8 @@ async function processTaskInChat(text, taskType) {
   const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
   const taskNames = {
     'rephrase': '✏️ Rephrase',
-    'shorten': '↕️ Shorten',
-    'formal': '💼 More formal',
-    'casual': '🎨 More casual',
-    'bulletize': '∷ Bulletize',
     'summarize': '📋 Summarize',
-    'cover-letter': 'Draft Cover Letter',
-    'proposal': 'Draft Proposal',
-    'email': 'Draft Email',
-    'post': 'Draft Social Post',
-    'custom': 'Custom Writing Task'
+    'custom': '✨ Custom Task'
   };
 
   const taskName = taskNames[taskType] || 'Process text';
