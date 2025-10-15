@@ -619,38 +619,87 @@ function copyMessageToClipboard(messageElement, button) {
 function insertMessageText(messageElement, button) {
   const text = messageElement.textContent;
 
-  if (lastActiveElement) {
+  if (!lastActiveElement) {
+    // If no element was tracked, show error
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Click in a text field first`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
+    return;
+  }
+
+  // Check if the element still exists in the DOM
+  if (!document.body.contains(lastActiveElement)) {
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Text field no longer available`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
+    return;
+  }
+
+  try {
     // Check if the element is an input or textarea
     if (lastActiveElement.tagName === 'INPUT' || lastActiveElement.tagName === 'TEXTAREA') {
-      const start = lastActiveElement.selectionStart || 0;
-      const end = lastActiveElement.selectionEnd || 0;
+      // Get current position or use last stored position
+      let start = lastActiveElement.selectionStart ?? lastCursorPosition.start;
+      let end = lastActiveElement.selectionEnd ?? lastCursorPosition.end;
       const currentValue = lastActiveElement.value;
 
-      lastActiveElement.value = currentValue.substring(0, start) + text + currentValue.substring(end);
+      // Insert text at cursor position
+      const newValue = currentValue.substring(0, start) + text + currentValue.substring(end);
+      lastActiveElement.value = newValue;
+
+      // Focus and set cursor after inserted text
       lastActiveElement.focus();
-      lastActiveElement.selectionStart = lastActiveElement.selectionEnd = start + text.length;
+      const newPosition = start + text.length;
+      lastActiveElement.setSelectionRange(newPosition, newPosition);
+
+      // Trigger input event for frameworks that listen to it
+      lastActiveElement.dispatchEvent(new Event('input', { bubbles: true }));
     }
     // Check if it's a contenteditable element
     else if (lastActiveElement.isContentEditable) {
       lastActiveElement.focus();
-      document.execCommand('insertText', false, text);
+
+      // Try modern approach first
+      if (typeof lastActiveElement.setRangeText === 'function') {
+        lastActiveElement.setRangeText(text);
+      } else {
+        // Fallback to execCommand (deprecated but still works)
+        document.execCommand('insertText', false, text);
+      }
     }
+
+    // Show success feedback
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      Inserted!
+    `;
+    button.style.color = '#10b981';
+
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to insert text:', error);
+    const originalHTML = button.innerHTML;
+    button.innerHTML = `⚠️ Insert failed`;
+    button.style.color = '#ef4444';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = '';
+    }, 2500);
   }
-
-  // Show success feedback
-  const originalHTML = button.innerHTML;
-  button.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-    Inserted!
-  `;
-  button.style.color = '#10b981';
-
-  setTimeout(() => {
-    button.innerHTML = originalHTML;
-    button.style.color = '';
-  }, 2000);
 }
 
 // Send chat message
@@ -893,12 +942,40 @@ function regenerateContent() {
   }
 }
 
-// Track the active element before showing the context menu
+// Track the active element and cursor position
+let lastCursorPosition = { start: 0, end: 0 };
+
+// Update tracking when user interacts with input fields
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.ai-writer-ui')) {
     lastActiveElement = document.activeElement;
+    updateCursorPosition();
   }
 });
+
+document.addEventListener('keyup', (e) => {
+  if (!e.target.closest('.ai-writer-ui')) {
+    lastActiveElement = document.activeElement;
+    updateCursorPosition();
+  }
+});
+
+document.addEventListener('focusin', (e) => {
+  if (!e.target.closest('.ai-writer-ui')) {
+    lastActiveElement = e.target;
+    updateCursorPosition();
+  }
+});
+
+// Update cursor position helper
+function updateCursorPosition() {
+  if (lastActiveElement && (lastActiveElement.tagName === 'INPUT' || lastActiveElement.tagName === 'TEXTAREA')) {
+    lastCursorPosition = {
+      start: lastActiveElement.selectionStart || 0,
+      end: lastActiveElement.selectionEnd || 0
+    };
+  }
+}
 
 // Keyboard shortcut: Ctrl+Shift+Space (or Cmd+Shift+Space on Mac)
 document.addEventListener('keydown', (e) => {
