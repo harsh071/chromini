@@ -516,6 +516,115 @@ function showChatUI() {
   setTimeout(() => input.focus(), 100);
 }
 
+// Add action buttons to message
+function addMessageActions(messageWrapper, messageElement) {
+  // Don't add if actions already exist
+  if (messageWrapper.querySelector('.ai-writer-message-actions')) {
+    return;
+  }
+
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'ai-writer-message-actions';
+  actionsDiv.innerHTML = `
+    <button class="ai-writer-message-btn copy-btn" title="Copy to clipboard">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      Copy
+    </button>
+    <button class="ai-writer-message-btn insert-btn" title="Insert at cursor">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Insert
+    </button>
+  `;
+
+  messageWrapper.appendChild(actionsDiv);
+
+  // Add event listeners
+  const copyBtn = actionsDiv.querySelector('.copy-btn');
+  const insertBtn = actionsDiv.querySelector('.insert-btn');
+
+  copyBtn.addEventListener('click', () => {
+    copyMessageToClipboard(messageElement, copyBtn);
+  });
+
+  insertBtn.addEventListener('click', () => {
+    insertMessageText(messageElement, insertBtn);
+  });
+}
+
+// Copy message to clipboard
+function copyMessageToClipboard(messageElement, button) {
+  const text = messageElement.textContent;
+
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      const originalHTML = button.innerHTML;
+      button.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Copied!
+      `;
+      button.style.color = '#10b981';
+
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.style.color = '';
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Failed to copy:', err);
+      button.textContent = 'Failed';
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+      }, 2000);
+    });
+}
+
+// Insert message text at cursor position
+function insertMessageText(messageElement, button) {
+  const text = messageElement.textContent;
+
+  if (lastActiveElement) {
+    // Check if the element is an input or textarea
+    if (lastActiveElement.tagName === 'INPUT' || lastActiveElement.tagName === 'TEXTAREA') {
+      const start = lastActiveElement.selectionStart || 0;
+      const end = lastActiveElement.selectionEnd || 0;
+      const currentValue = lastActiveElement.value;
+
+      lastActiveElement.value = currentValue.substring(0, start) + text + currentValue.substring(end);
+      lastActiveElement.focus();
+      lastActiveElement.selectionStart = lastActiveElement.selectionEnd = start + text.length;
+    }
+    // Check if it's a contenteditable element
+    else if (lastActiveElement.isContentEditable) {
+      lastActiveElement.focus();
+      document.execCommand('insertText', false, text);
+    }
+  }
+
+  // Show success feedback
+  const originalHTML = button.innerHTML;
+  button.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    Inserted!
+  `;
+  button.style.color = '#10b981';
+
+  setTimeout(() => {
+    button.innerHTML = originalHTML;
+    button.style.color = '';
+  }, 2000);
+}
+
 // Send chat message
 async function sendChatMessage(message) {
   const messagesContainer = document.getElementById('chat-messages');
@@ -551,11 +660,16 @@ async function sendChatMessage(message) {
     await initWriter('custom');
   }
 
-  // Add assistant message placeholder
+  // Add assistant message wrapper
+  const messageWrapper = document.createElement('div');
+  messageWrapper.className = 'ai-writer-message-wrapper assistant-wrapper';
+
   const assistantMsg = document.createElement('div');
   assistantMsg.className = 'ai-writer-chat-message assistant';
   assistantMsg.textContent = '';
-  messagesContainer.appendChild(assistantMsg);
+
+  messageWrapper.appendChild(assistantMsg);
+  messagesContainer.appendChild(messageWrapper);
 
   try {
     let finalPrompt = message;
@@ -576,6 +690,9 @@ async function sendChatMessage(message) {
       assistantMsg.textContent = result;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    // Add action buttons after streaming completes
+    addMessageActions(messageWrapper, assistantMsg);
   } catch (error) {
     assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
     assistantMsg.style.color = '#ef4444';
@@ -834,11 +951,16 @@ async function processTaskInChat(text, taskType) {
     return;
   }
 
-  // Add assistant message placeholder
+  // Add assistant message wrapper
+  const messageWrapper = document.createElement('div');
+  messageWrapper.className = 'ai-writer-message-wrapper assistant-wrapper';
+
   const assistantMsg = document.createElement('div');
   assistantMsg.className = 'ai-writer-chat-message assistant';
   assistantMsg.textContent = '';
-  messagesContainer.appendChild(assistantMsg);
+
+  messageWrapper.appendChild(assistantMsg);
+  messagesContainer.appendChild(messageWrapper);
 
   // Build the prompt
   const fullPrompt = config.prompt + text;
@@ -853,6 +975,9 @@ async function processTaskInChat(text, taskType) {
       assistantMsg.textContent = result;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    // Add action buttons after streaming completes
+    addMessageActions(messageWrapper, assistantMsg);
   } catch (error) {
     assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
     assistantMsg.style.color = '#ef4444';
