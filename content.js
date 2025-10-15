@@ -374,6 +374,62 @@ function toggleMinimize(element) {
   element.classList.toggle('minimized');
 }
 
+// Toggle chat minimize/maximize
+function toggleChatMinimize(chatDiv) {
+  chatDiv.classList.toggle('chat-minimized');
+
+  // Update minimize button text
+  const minimizeBtn = chatDiv.querySelector('.ai-writer-minimize');
+  if (minimizeBtn) {
+    if (chatDiv.classList.contains('chat-minimized')) {
+      minimizeBtn.textContent = '□';
+      minimizeBtn.title = 'Restore';
+    } else {
+      minimizeBtn.textContent = '−';
+      minimizeBtn.title = 'Minimize';
+    }
+  }
+}
+
+// Reset chat conversation
+function resetChat() {
+  const messagesContainer = document.getElementById('chat-messages');
+  if (!messagesContainer) return;
+
+  // Show confirmation
+  if (confirm('Are you sure you want to clear the chat history? This cannot be undone.')) {
+    // Clear all messages
+    messagesContainer.innerHTML = '';
+
+    // Show welcome message again
+    const welcomeMsg = document.createElement('div');
+    welcomeMsg.className = 'ai-writer-chat-welcome';
+    welcomeMsg.textContent = '👋 Hi! Ask me anything or use the context menu on selected text for specific tasks.';
+    messagesContainer.appendChild(welcomeMsg);
+
+    // Clear any pending custom tasks
+    window.pendingCustomTask = null;
+
+    // Destroy and recreate writer instance to reset context
+    if (writerInstance) {
+      writerInstance.destroy();
+      writerInstance = null;
+    }
+
+    // Show a brief success indicator
+    const resetBtn = document.querySelector('.ai-writer-reset');
+    if (resetBtn) {
+      const originalHTML = resetBtn.innerHTML;
+      resetBtn.innerHTML = '✓';
+      resetBtn.style.color = '#10b981';
+      setTimeout(() => {
+        resetBtn.innerHTML = originalHTML;
+        resetBtn.style.color = '';
+      }, 1500);
+    }
+  }
+}
+
 // Floating chat button
 function showChatButton() {
   // Don't show if button already exists
@@ -432,6 +488,15 @@ function showChatUI() {
     <div class="ai-writer-header">
       <span>💬 AI Chat Assistant</span>
       <div class="ai-writer-header-controls">
+        <button class="ai-writer-reset" title="Reset Chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M3 21v-5h5"/>
+          </svg>
+        </button>
+        <button class="ai-writer-minimize" title="Minimize">−</button>
         <button class="ai-writer-close">×</button>
       </div>
     </div>
@@ -457,10 +522,20 @@ function showChatUI() {
   const input = chatDiv.querySelector('.ai-writer-chat-input');
   const sendBtn = chatDiv.querySelector('.ai-writer-send-btn');
   const closeBtn = chatDiv.querySelector('.ai-writer-close');
+  const minimizeBtn = chatDiv.querySelector('.ai-writer-minimize');
+  const resetBtn = chatDiv.querySelector('.ai-writer-reset');
 
   // Event listeners
   closeBtn.addEventListener('click', () => {
     chatDiv.classList.add('hidden');
+  });
+
+  minimizeBtn.addEventListener('click', () => {
+    toggleChatMinimize(chatDiv);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    resetChat();
   });
 
   sendBtn.addEventListener('click', () => {
@@ -511,7 +586,11 @@ async function sendChatMessage(message) {
   // Check if writer is available
   const available = await checkWriterAvailability();
   if (!available) {
-    showError('Writer API is not available on this device. Please check system requirements.');
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'ai-writer-chat-message assistant';
+    errorMsg.textContent = 'Sorry, the Writer API is not available on this device. Please check system requirements.';
+    errorMsg.style.color = '#ef4444';
+    messagesContainer.appendChild(errorMsg);
     return;
   }
 
@@ -527,8 +606,17 @@ async function sendChatMessage(message) {
   messagesContainer.appendChild(assistantMsg);
 
   try {
+    let finalPrompt = message;
+
+    // Check if there's a pending custom task
+    if (window.pendingCustomTask) {
+      const { text } = window.pendingCustomTask;
+      finalPrompt = message + ' ' + text;
+      window.pendingCustomTask = null; // Clear it after use
+    }
+
     // Stream the response
-    const stream = writerInstance.writeStreaming(message);
+    const stream = writerInstance.writeStreaming(finalPrompt);
     let result = '';
 
     for await (const chunk of stream) {
@@ -723,24 +811,118 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Process text task in chat
+async function processTaskInChat(text, taskType) {
+  // Ensure chat is open
+  let chatDiv = document.getElementById('ai-writer-chat');
+  if (!chatDiv || chatDiv.classList.contains('hidden')) {
+    toggleChatUI();
+    // Wait a bit for the chat to render
+    await new Promise(resolve => setTimeout(resolve, 150));
+    chatDiv = document.getElementById('ai-writer-chat');
+  }
+
+  const messagesContainer = document.getElementById('chat-messages');
+  if (!messagesContainer) return;
+
+  // Remove welcome message if present
+  const welcomeMsg = messagesContainer.querySelector('.ai-writer-chat-welcome');
+  if (welcomeMsg) {
+    welcomeMsg.remove();
+  }
+
+  // Get task config for friendly name
+  const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
+  const taskNames = {
+    'rephrase': '✏️ Rephrase',
+    'shorten': '↕️ Shorten',
+    'formal': '💼 More formal',
+    'casual': '🎨 More casual',
+    'bulletize': '∷ Bulletize',
+    'summarize': '📋 Summarize',
+    'cover-letter': 'Draft Cover Letter',
+    'proposal': 'Draft Proposal',
+    'email': 'Draft Email',
+    'post': 'Draft Social Post',
+    'custom': 'Custom Writing Task'
+  };
+
+  const taskName = taskNames[taskType] || 'Process text';
+
+  // Add a system message showing the selected text and task
+  const systemMsg = document.createElement('div');
+  systemMsg.className = 'ai-writer-chat-message system';
+  systemMsg.innerHTML = `
+    <strong>${taskName}</strong><br>
+    <span style="opacity: 0.8; font-size: 13px;">"${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"</span>
+  `;
+  messagesContainer.appendChild(systemMsg);
+
+  // Scroll to bottom
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+  // Check if writer is available
+  const available = await checkWriterAvailability();
+  if (!available) {
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'ai-writer-chat-message assistant';
+    errorMsg.textContent = 'Sorry, the Writer API is not available on this device. Please check system requirements.';
+    errorMsg.style.color = '#ef4444';
+    messagesContainer.appendChild(errorMsg);
+    return;
+  }
+
+  // Initialize writer if needed
+  if (!writerInstance) {
+    await initWriter(taskType);
+  }
+
+  // For custom tasks, ask for the prompt in chat
+  if (taskType === 'custom') {
+    const promptMsg = document.createElement('div');
+    promptMsg.className = 'ai-writer-chat-message assistant';
+    promptMsg.textContent = 'What would you like me to do with this text?';
+    messagesContainer.appendChild(promptMsg);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Store context for the next user message
+    window.pendingCustomTask = { text, taskType };
+    return;
+  }
+
+  // Add assistant message placeholder
+  const assistantMsg = document.createElement('div');
+  assistantMsg.className = 'ai-writer-chat-message assistant';
+  assistantMsg.textContent = '';
+  messagesContainer.appendChild(assistantMsg);
+
+  // Build the prompt
+  const fullPrompt = config.prompt + text;
+
+  try {
+    // Stream the response
+    const stream = writerInstance.writeStreaming(fullPrompt);
+    let result = '';
+
+    for await (const chunk of stream) {
+      result += chunk;
+      assistantMsg.textContent = result;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  } catch (error) {
+    assistantMsg.textContent = 'Sorry, I encountered an error: ' + error.message;
+    assistantMsg.style.color = '#ef4444';
+  }
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'processText') {
     lastText = request.text;
     lastTaskType = request.taskType;
 
-    checkWriterAvailability().then(available => {
-      if (available) {
-        // Show custom prompt dialog for custom tasks
-        if (request.taskType === 'custom') {
-          showCustomPromptDialog(request.text);
-        } else {
-          processWithWriter(request.text, request.taskType);
-        }
-      } else {
-        showError('Writer API is not available on this device. Please check system requirements.');
-      }
-    });
+    // Route all tasks to the chat interface
+    processTaskInChat(request.text, request.taskType);
   }
   return true;
 });
