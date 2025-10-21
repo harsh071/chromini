@@ -3,6 +3,9 @@
 
 let writerInstance = null;
 let isWriterAvailable = false;
+let pageContext = null;
+let pageContextEnabled = true;
+let isContextExtracting = false;
 
 // Task configurations
 const TASK_CONFIGS = {
@@ -25,6 +28,91 @@ const TASK_CONFIGS = {
     sharedContext: 'General writing task'
   }
 };
+
+// Page Context Management
+const MAX_CONTEXT_WORDS = 3000;
+
+// Extract visible text from the current page
+function extractPageContext() {
+  try {
+    // Check if we're in a PDF viewer
+    const isPDF = document.contentType === 'application/pdf' ||
+                  window.location.href.endsWith('.pdf') ||
+                  document.querySelector('embed[type="application/pdf"]');
+
+    if (isPDF) {
+      // For PDFs, try to get text from the embed or return a helpful message
+      const pdfEmbed = document.querySelector('embed[type="application/pdf"]');
+      if (pdfEmbed) {
+        return 'This appears to be a PDF document. The text content may not be directly accessible. Please select specific text to work with it.';
+      }
+    }
+
+    // Get all visible text from the page
+    let text = document.body.innerText || document.body.textContent || '';
+
+    // Clean up the text
+    text = text
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n\s*\n/g, '\n') // Remove empty lines
+      .trim();
+
+    // Limit to first MAX_CONTEXT_WORDS words to avoid overwhelming the model
+    const words = text.split(/\s+/);
+    if (words.length > MAX_CONTEXT_WORDS) {
+      text = words.slice(0, MAX_CONTEXT_WORDS).join(' ') + '...';
+    }
+
+    return text;
+  } catch (error) {
+    console.error('Error extracting page context:', error);
+    return null;
+  }
+}
+
+// Get or refresh page context
+async function getPageContext(forceRefresh = false) {
+  if (isContextExtracting) {
+    return pageContext; // Return cached if already extracting
+  }
+
+  if (!pageContextEnabled) {
+    return null;
+  }
+
+  if (pageContext && !forceRefresh) {
+    return pageContext;
+  }
+
+  isContextExtracting = true;
+  pageContext = extractPageContext();
+  isContextExtracting = false;
+
+  return pageContext;
+}
+
+// Toggle page context feature
+function togglePageContext() {
+  pageContextEnabled = !pageContextEnabled;
+
+  // Update UI to reflect state
+  const toggleBtn = document.querySelector('.ai-context-toggle');
+  const badge = document.querySelector('.ai-context-badge');
+
+  if (toggleBtn) {
+    if (pageContextEnabled) {
+      toggleBtn.classList.add('active');
+      toggleBtn.title = 'Page context enabled - Click to disable';
+      if (badge) badge.style.display = 'flex';
+    } else {
+      toggleBtn.classList.remove('active');
+      toggleBtn.title = 'Page context disabled - Click to enable';
+      if (badge) badge.style.display = 'none';
+    }
+  }
+
+  return pageContextEnabled;
+}
 
 // Check if Writer API is available
 async function checkWriterAvailability() {
@@ -466,8 +554,22 @@ function showChatUI() {
   chatDiv.className = 'ai-writer-ui ai-chat-dropdown';
   chatDiv.innerHTML = `
     <div class="ai-writer-header">
-      <span>💬 AI Chat Assistant</span>
+      <div class="ai-writer-header-left">
+        <span>💬 AI Chat Assistant</span>
+        <div class="ai-context-badge" title="Page context active">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+      </div>
       <div class="ai-writer-header-controls">
+        <button class="ai-context-toggle active" title="Page context enabled - Click to disable">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+          </svg>
+        </button>
         <button class="ai-writer-reset" title="Reset Chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
@@ -483,11 +585,11 @@ function showChatUI() {
     <div class="ai-writer-content">
       <div class="ai-writer-chat-messages" id="chat-messages">
         <div class="ai-writer-chat-welcome">
-          👋 Hi! Ask me anything or use the context menu on selected text for specific tasks.
+          👋 Hi! I can see the page content. Ask me anything about what's on this page!
         </div>
       </div>
       <div class="ai-writer-chat-input-container">
-        <textarea class="ai-writer-chat-input" placeholder="Ask me anything..." rows="2"></textarea>
+        <textarea class="ai-writer-chat-input" placeholder="Ask me anything about this page..." rows="2"></textarea>
         <button class="ai-writer-send-btn" title="Send (Enter)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
@@ -504,6 +606,7 @@ function showChatUI() {
   const closeBtn = chatDiv.querySelector('.ai-writer-close');
   const minimizeBtn = chatDiv.querySelector('.ai-writer-minimize');
   const resetBtn = chatDiv.querySelector('.ai-writer-reset');
+  const contextToggleBtn = chatDiv.querySelector('.ai-context-toggle');
 
   // Event listeners
   closeBtn.addEventListener('click', () => {
@@ -516,6 +619,26 @@ function showChatUI() {
 
   resetBtn.addEventListener('click', () => {
     resetChat();
+  });
+
+  contextToggleBtn.addEventListener('click', () => {
+    const enabled = togglePageContext();
+    // Show feedback message
+    const messagesContainer = document.getElementById('chat-messages');
+    if (messagesContainer) {
+      const feedbackMsg = document.createElement('div');
+      feedbackMsg.className = 'ai-writer-chat-message system';
+      feedbackMsg.textContent = enabled
+        ? '✓ Page context enabled - I can now see and answer questions about this page'
+        : '✗ Page context disabled - I will only respond to your direct questions';
+      feedbackMsg.style.fontSize = '13px';
+      feedbackMsg.style.opacity = '0.8';
+      messagesContainer.appendChild(feedbackMsg);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      // Remove feedback after 3 seconds
+      setTimeout(() => feedbackMsg.remove(), 3000);
+    }
   });
 
   sendBtn.addEventListener('click', () => {
@@ -756,6 +879,21 @@ async function sendChatMessage(message) {
       const { text } = window.pendingCustomTask;
       finalPrompt = message + ' ' + text;
       window.pendingCustomTask = null; // Clear it after use
+    }
+    // Include page context if enabled and no pending task
+    else if (pageContextEnabled) {
+      const context = await getPageContext();
+      if (context && context.length > 50) {
+        // Only include context if it's substantial
+        finalPrompt = `Based on the following page content, please answer the user's question.\n\nPage content:\n${context}\n\nUser question: ${message}`;
+
+        // Update badge to show context was used
+        const badge = document.querySelector('.ai-context-badge');
+        if (badge) {
+          badge.classList.add('active');
+          setTimeout(() => badge.classList.remove('active'), 2000);
+        }
+      }
     }
 
     // Stream the response
