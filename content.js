@@ -316,8 +316,9 @@ function showResultUI(content) {
 
 function updateResultUI(content) {
   const resultTextEl = document.querySelector('.ai-writer-result-text');
+  console.log(content)
   if (resultTextEl) {
-    resultTextEl.textContent = content;
+    resultTextEl.innerHTML = formatMarkdown(content);
   }
 }
 
@@ -902,9 +903,11 @@ async function sendChatMessage(message) {
 
     for await (const chunk of stream) {
       result += chunk;
-      assistantMsg.textContent = result;
+      assistantMsg.innerHTML = formatMarkdown(result);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    console.log(result)
 
     // Add action buttons after streaming completes
     addMessageActions(messageWrapper, assistantMsg);
@@ -1215,9 +1218,11 @@ async function processTaskInChat(text, taskType) {
 
     for await (const chunk of stream) {
       result += chunk;
-      assistantMsg.textContent = result;
+      assistantMsg.innerHTML = formatMarkdown(result);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    console.log(result);
 
     // Add action buttons after streaming completes
     addMessageActions(messageWrapper, assistantMsg);
