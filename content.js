@@ -550,6 +550,15 @@ function showChatUI() {
   const existingModals = document.querySelectorAll('.ai-writer-ui:not(#ai-writer-chat)');
   existingModals.forEach(modal => modal.remove());
 
+  // Detect if we're viewing a PDF to customize the welcome message
+  const isPDF = document.contentType === 'application/pdf' ||
+                window.location.href.endsWith('.pdf') ||
+                document.querySelector('embed[type="application/pdf"]');
+
+  const welcomeMessage = isPDF
+    ? '📄 Hi! This is a PDF document. PDF text extraction is not yet supported. Please use the context menu on selected text for specific tasks.'
+    : '👋 Hi! I can see the page content. Ask me anything about what\'s on this page!';
+
   const chatDiv = document.createElement('div');
   chatDiv.id = 'ai-writer-chat';
   chatDiv.className = 'ai-writer-ui ai-chat-dropdown';
@@ -586,7 +595,7 @@ function showChatUI() {
     <div class="ai-writer-content">
       <div class="ai-writer-chat-messages" id="chat-messages">
         <div class="ai-writer-chat-welcome">
-          👋 Hi! I can see the page content. Ask me anything about what's on this page!
+          ${welcomeMessage}
         </div>
       </div>
       <div class="ai-writer-chat-input-container">
