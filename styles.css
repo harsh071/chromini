@@ -80,7 +80,7 @@
 }
 
 .ai-chat-dropdown .ai-writer-header {
-  border-radius: 0;
+  border-radius: 16px 16px 0 0;
   padding: 20px 24px;
   font-size: 16px;
 }
