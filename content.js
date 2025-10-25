@@ -32,20 +32,16 @@ const TASK_CONFIGS = {
 // Page Context Management
 const MAX_CONTEXT_WORDS = 3000;
 
-// Extract visible text from the current page
-function extractPageContext() {
+// Extract visible text from the current page (supports both webpages and PDFs)
+async function extractPageContext() {
   try {
     // Check if we're in a PDF viewer
-    const isPDF = document.contentType === 'application/pdf' ||
-                  window.location.href.endsWith('.pdf') ||
-                  document.querySelector('embed[type="application/pdf"]');
+    const isPDF = window.PDFExtractor && window.PDFExtractor.isPDFPage();
 
     if (isPDF) {
-      // For PDFs, try to get text from the embed or return a helpful message
-      const pdfEmbed = document.querySelector('embed[type="application/pdf"]');
-      if (pdfEmbed) {
-        return 'This appears to be a PDF document. The text content may not be directly accessible. Please select specific text to work with it.';
-      }
+      // Extract text from PDF
+      const pdfText = await window.PDFExtractor.extractPDFText(window.location.href, MAX_CONTEXT_WORDS);
+      return pdfText;
     }
 
     // Get all visible text from the page
@@ -85,7 +81,7 @@ async function getPageContext(forceRefresh = false) {
   }
 
   isContextExtracting = true;
-  pageContext = extractPageContext();
+  pageContext = await extractPageContext();
   isContextExtracting = false;
 
   return pageContext;
@@ -316,7 +312,7 @@ function showResultUI(content) {
 
 function updateResultUI(content) {
   const resultTextEl = document.querySelector('.ai-writer-result-text');
-  console.log(content)
+  
   if (resultTextEl) {
     resultTextEl.innerHTML = formatMarkdown(content);
   }
@@ -551,12 +547,10 @@ function showChatUI() {
   existingModals.forEach(modal => modal.remove());
 
   // Detect if we're viewing a PDF to customize the welcome message
-  const isPDF = document.contentType === 'application/pdf' ||
-                window.location.href.endsWith('.pdf') ||
-                document.querySelector('embed[type="application/pdf"]');
+  const isPDF = window.PDFExtractor && window.PDFExtractor.isPDFPage();
 
   const welcomeMessage = isPDF
-    ? '📄 Hi! This is a PDF document. PDF text extraction is not yet supported. Please use the context menu on selected text for specific tasks.'
+    ? '📄 Extracting text from PDF<span class="loading-dots">...</span>'
     : '👋 Hi! I can see the page content. Ask me anything about what\'s on this page!';
 
   const chatDiv = document.createElement('div');
@@ -675,6 +669,28 @@ function showChatUI() {
 
   // Focus input
   setTimeout(() => input.focus(), 100);
+
+  // If this is a PDF, extract text and update welcome message
+  if (isPDF) {
+    initializePDFContext();
+  }
+}
+
+// Initialize PDF context extraction
+async function initializePDFContext() {
+  const welcomeMsg = document.querySelector('.ai-writer-chat-welcome');
+  if (!welcomeMsg) return;
+
+  try {
+    // Extract PDF text (this will cache it in pageContext)
+    await getPageContext(true);
+
+    // Update welcome message
+    welcomeMsg.innerHTML = '📄 PDF text extracted successfully! Ask me anything about this document.';
+  } catch (error) {
+    console.error('Failed to extract PDF text:', error);
+    welcomeMsg.innerHTML = '⚠️ Failed to extract PDF text. You can still select text to use the context menu features.';
+  }
 }
 
 // Add action buttons to message

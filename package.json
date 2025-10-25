@@ -1,0 +1,14 @@
+{
+  "name": "ai-writing-assistant",
+  "version": "1.0.0",
+  "description": "Chrome extension for AI-powered writing assistance with PDF support",
+  "private": true,
+  "scripts": {
+    "install-pdf": "npm install pdfjs-dist@4.2.67 && mkdir -p lib && cp node_modules/pdfjs-dist/build/pdf.min.mjs lib/pdf.min.js && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs lib/pdf.worker.min.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.2.67"
+  },
+  "devDependencies": {},
+  "note": "This package.json is only needed for development to update PDF.js library. End users can install the extension directly from the files in this directory."
+}
