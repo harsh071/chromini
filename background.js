@@ -58,6 +58,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'checkWriterAPI') {
     // This will be handled by content script since it has access to DOM APIs
     sendResponse({ status: 'forward_to_content' });
+  } else if (request.action === 'fetchPDF') {
+    // Fetch PDF from background script to avoid CORS issues
+    fetch(request.url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => {
+        sendResponse({
+          success: true,
+          data: Array.from(new Uint8Array(arrayBuffer))
+        });
+      })
+      .catch(error => {
+        sendResponse({
+          success: false,
+          error: error.message
+        });
+      });
+    return true; // Keep channel open for async response
   }
   return true;
 });
