@@ -654,6 +654,9 @@
   border-bottom-left-radius: 6px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
   color: white;
+  p {
+    color: white;
+  }
 }
 
 .ai-writer-chat-message.system {
