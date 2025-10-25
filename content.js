@@ -345,13 +345,13 @@ async function processWithAI(text, taskType, customPrompt = null, targetLanguage
     if (apiType === 'summarizer') {
       const stream = instance.summarizeStreaming(text);
       for await (const chunk of stream) {
-        result = chunk;
+        result += chunk;
         updateResultUI(result);
       }
     } else if (apiType === 'rewriter') {
       const stream = instance.rewriteStreaming(text);
       for await (const chunk of stream) {
-        result = chunk;
+        result += chunk;
         updateResultUI(result);
       }
     } else if (apiType === 'writer') {
@@ -1362,14 +1362,56 @@ async function showTranslateDialog(text, taskType, messageWrapper, assistantMsg,
       assistantMsg.innerHTML = `<p style="opacity: 0.7;">Translating to ${btn.textContent}...</p>`;
 
       try {
-        // Create translator instance for selected language
+        let sourceLang = 'en'; // Default source language
+
+        // Use Language Detector API to auto-detect source language
+        if ('LanguageDetector' in self) {
+          try {
+            assistantMsg.innerHTML = `<p style="opacity: 0.7;">Detecting language...</p>`;
+
+            const detector = await self.LanguageDetector.create({
+              monitor(m) {
+                m.addEventListener('downloadprogress', (e) => {
+                  const percent = Math.round(e.loaded * 100);
+                  assistantMsg.innerHTML = `<p style="opacity: 0.7;">Downloading language detector: ${percent}%</p>`;
+                });
+              }
+            });
+
+            const detectionResults = await detector.detect(text);
+            if (detectionResults && detectionResults.length > 0) {
+              sourceLang = detectionResults[0].detectedLanguage;
+              console.log(`Detected source language: ${sourceLang} (confidence: ${detectionResults[0].confidence})`);
+            }
+          } catch (detectionError) {
+            console.warn('Language detection failed, using default:', detectionError);
+            // Fall back to default 'en' if detection fails
+          }
+        }
+
+        // Check if translation is possible
+        const canTranslate = await self.Translator.availability({
+          sourceLanguage: sourceLang,
+          targetLanguage: targetLang
+        });
+
+        if (canTranslate === 'no') {
+          assistantMsg.textContent = `Translation from ${sourceLang} to ${btn.textContent} is not supported on this device.`;
+          assistantMsg.style.color = '#ef4444';
+          return;
+        }
+
+        // Update message to show translating
+        assistantMsg.innerHTML = `<p style="opacity: 0.7;">Translating from ${sourceLang} to ${btn.textContent}...</p>`;
+
+        // Create translator instance
         const translator = await self.Translator.create({
-          sourceLanguage: 'en',
+          sourceLanguage: sourceLang,
           targetLanguage: targetLang,
           monitor(m) {
             m.addEventListener('downloadprogress', (e) => {
               const percent = Math.round(e.loaded * 100);
-              assistantMsg.innerHTML = `<p style="opacity: 0.7;">Downloading model: ${percent}%</p>`;
+              assistantMsg.innerHTML = `<p style="opacity: 0.7;">Downloading translation model: ${percent}%</p>`;
             });
           }
         });
@@ -1381,9 +1423,6 @@ async function showTranslateDialog(text, taskType, messageWrapper, assistantMsg,
         addMessageActions(messageWrapper, assistantMsg);
 
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-        // Clean up
-        translator.destroy();
       } catch (error) {
         assistantMsg.textContent = 'Translation failed: ' + error.message;
         assistantMsg.style.color = '#ef4444';
@@ -1494,14 +1533,14 @@ async function processTaskInChat(text, taskType) {
     if (apiType === 'summarizer') {
       const stream = summarizerInstance.summarizeStreaming(text);
       for await (const chunk of stream) {
-        result = chunk;
+        result += chunk;
         assistantMsg.innerHTML = formatMarkdown(result);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
     } else if (apiType === 'rewriter') {
       const stream = rewriterInstance.rewriteStreaming(text);
       for await (const chunk of stream) {
-        result = chunk;
+        result += chunk;
         assistantMsg.innerHTML = formatMarkdown(result);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
