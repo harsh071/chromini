@@ -1,8 +1,11 @@
 // Content script for AI Writing Assistant
-// This script handles the Writer API integration and UI
+// This script handles the Prompt API (Summarizer, Rewriter, Writer, Translator) integration and UI
 
+let summarizerInstance = null;
+let rewriterInstance = null;
 let writerInstance = null;
-let isWriterAvailable = false;
+let translatorInstance = null;
+let isAIAvailable = false;
 let pageContext = null;
 let pageContextEnabled = true;
 let isContextExtracting = false;
@@ -10,19 +13,32 @@ let isContextExtracting = false;
 // Task configurations
 const TASK_CONFIGS = {
   'rephrase': {
-    prompt: 'Rephrase the following text while keeping the same meaning: ',
-    tone: 'neutral',
-    length: 'medium',
+    apiType: 'rewriter',
+    tone: 'as-is',
+    length: 'as-is',
     sharedContext: 'Text rephrasing'
   },
   'summarize': {
-    prompt: 'Summarize the following text: ',
-    tone: 'neutral',
+    apiType: 'summarizer',
+    type: 'key-points',
+    format: 'markdown',
     length: 'short',
     sharedContext: 'Text summarization'
   },
+  'write': {
+    apiType: 'writer',
+    tone: 'neutral',
+    length: 'medium',
+    sharedContext: 'Content writing'
+  },
+  'translate': {
+    apiType: 'translator',
+    sourceLanguage: 'en',
+    targetLanguage: 'es',
+    sharedContext: 'Translation'
+  },
   'custom': {
-    prompt: 'Write content for: ',
+    apiType: 'writer',
     tone: 'neutral',
     length: 'medium',
     sharedContext: 'General writing task'
@@ -110,28 +126,60 @@ function togglePageContext() {
   return pageContextEnabled;
 }
 
-// Check if Writer API is available
-async function checkWriterAvailability() {
+// Check if AI APIs are available
+async function checkAIAvailability() {
   try {
-    if (!('Writer' in self)) {
-      console.log('Writer API not supported in this browser');
-      return false;
+    const capabilities = {
+      summarizer: false,
+      rewriter: false,
+      writer: false,
+      translator: false
+    };
+
+    // Check Summarizer API
+    if ('Summarizer' in self) {
+      const summarizerAvailability = await self.Summarizer.availability();
+      capabilities.summarizer = summarizerAvailability !== 'unavailable';
+      console.log('Summarizer API availability:', summarizerAvailability);
     }
 
-    const availability = await self.Writer.availability();
-    console.log('Writer API availability:', availability);
+    // Check Rewriter API
+    if ('Rewriter' in self) {
+      const rewriterAvailability = await self.Rewriter.availability();
+      capabilities.rewriter = rewriterAvailability !== 'unavailable';
+      console.log('Rewriter API availability:', rewriterAvailability);
+    }
 
-    return availability !== 'unavailable';
+    // Check Writer API
+    if ('Writer' in self) {
+      const writerAvailability = await self.Writer.availability();
+      capabilities.writer = writerAvailability !== 'unavailable';
+      console.log('Writer API availability:', writerAvailability);
+    }
+
+    // Check Translator API
+    if ('Translator' in self) {
+      const translatorAvailability = await self.Translator.availability({
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+      });
+      capabilities.translator = translatorAvailability !== 'unavailable';
+      console.log('Translator API availability:', translatorAvailability);
+    }
+
+    console.log('AI capabilities:', capabilities);
+    return capabilities.summarizer || capabilities.rewriter || capabilities.writer || capabilities.translator;
   } catch (error) {
-    console.error('Error checking Writer API availability:', error);
+    console.error('Error checking AI availability:', error);
     return false;
   }
 }
 
-// Initialize Writer API
-async function initWriter(taskType) {
+// Initialize AI API based on task type
+async function initAI(taskType) {
   try {
     const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
+    const apiType = config.apiType;
 
     // Show loading indicator in the chat if it exists
     const messagesContainer = document.getElementById('chat-messages');
@@ -140,43 +188,113 @@ async function initWriter(taskType) {
     if (messagesContainer) {
       loadingMsg = document.createElement('div');
       loadingMsg.className = 'ai-writer-chat-message assistant loading-message';
-      loadingMsg.textContent = 'Initializing AI Writer...';
+      loadingMsg.textContent = `Initializing ${apiType}...`;
       messagesContainer.appendChild(loadingMsg);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    writerInstance = await self.Writer.create({
-      sharedContext: config.sharedContext,
-      tone: config.tone,
-      format: 'plain-text',
-      length: config.length,
-      outputLanguage: 'en',
-      monitor(m) {
-        m.addEventListener('downloadprogress', (e) => {
-          const percent = Math.round(e.loaded * 100);
-          if (loadingMsg) {
-            loadingMsg.textContent = `Downloading AI model: ${percent}%`;
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          }
-        });
-      }
-    });
+    let instance = null;
+
+    switch (apiType) {
+      case 'summarizer':
+        if (!summarizerInstance) {
+          summarizerInstance = await self.Summarizer.create({
+            type: config.type,
+            format: config.format,
+            length: config.length,
+            monitor(m) {
+              m.addEventListener('downloadprogress', (e) => {
+                const percent = Math.round(e.loaded * 100);
+                if (loadingMsg) {
+                  loadingMsg.textContent = `Downloading summarizer model: ${percent}%`;
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+              });
+            }
+          });
+        }
+        instance = summarizerInstance;
+        break;
+
+      case 'rewriter':
+        if (!rewriterInstance) {
+          rewriterInstance = await self.Rewriter.create({
+            tone: config.tone,
+            length: config.length,
+            sharedContext: config.sharedContext,
+            monitor(m) {
+              m.addEventListener('downloadprogress', (e) => {
+                const percent = Math.round(e.loaded * 100);
+                if (loadingMsg) {
+                  loadingMsg.textContent = `Downloading rewriter model: ${percent}%`;
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+              });
+            }
+          });
+        }
+        instance = rewriterInstance;
+        break;
+
+      case 'writer':
+        if (!writerInstance) {
+          writerInstance = await self.Writer.create({
+            tone: config.tone,
+            format: 'plain-text',
+            length: config.length,
+            sharedContext: config.sharedContext,
+            monitor(m) {
+              m.addEventListener('downloadprogress', (e) => {
+                const percent = Math.round(e.loaded * 100);
+                if (loadingMsg) {
+                  loadingMsg.textContent = `Downloading writer model: ${percent}%`;
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+              });
+            }
+          });
+        }
+        instance = writerInstance;
+        break;
+
+      case 'translator':
+        if (!translatorInstance) {
+          translatorInstance = await self.Translator.create({
+            sourceLanguage: config.sourceLanguage,
+            targetLanguage: config.targetLanguage,
+            monitor(m) {
+              m.addEventListener('downloadprogress', (e) => {
+                const percent = Math.round(e.loaded * 100);
+                if (loadingMsg) {
+                  loadingMsg.textContent = `Downloading translator model: ${percent}%`;
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+              });
+            }
+          });
+        }
+        instance = translatorInstance;
+        break;
+
+      default:
+        throw new Error(`Unknown API type: ${apiType}`);
+    }
 
     // Remove loading message after initialization
     if (loadingMsg) {
       loadingMsg.remove();
     }
 
-    return writerInstance;
+    return instance;
   } catch (error) {
-    console.error('Error initializing Writer:', error);
+    console.error('Error initializing AI:', error);
 
     // Show error in chat if available
     const messagesContainer = document.getElementById('chat-messages');
     if (messagesContainer) {
       const errorMsg = document.createElement('div');
       errorMsg.className = 'ai-writer-chat-message assistant';
-      errorMsg.textContent = 'Failed to initialize AI Writer: ' + error.message;
+      errorMsg.textContent = 'Failed to initialize AI: ' + error.message;
       errorMsg.style.color = '#ef4444';
       messagesContainer.appendChild(errorMsg);
     }
@@ -185,38 +303,75 @@ async function initWriter(taskType) {
   }
 }
 
-// Process text with Writer API
-async function processWithWriter(text, taskType, customPrompt = null) {
+// Process text with AI API
+async function processWithAI(text, taskType, customPrompt = null, targetLanguage = null) {
   try {
     const config = TASK_CONFIGS[taskType] || TASK_CONFIGS['custom'];
-    let fullPrompt;
+    const apiType = config.apiType;
 
-    // If it's a custom task and we have a custom prompt, use it
-    if (taskType === 'custom' && customPrompt) {
-      fullPrompt = customPrompt + ' ' + text;
-    } else {
-      fullPrompt = config.prompt + text;
+    // Get the appropriate instance
+    let instance;
+    switch (apiType) {
+      case 'summarizer':
+        instance = summarizerInstance || await initAI(taskType);
+        break;
+      case 'rewriter':
+        instance = rewriterInstance || await initAI(taskType);
+        break;
+      case 'writer':
+        instance = writerInstance || await initAI(taskType);
+        break;
+      case 'translator':
+        // For translator, we might need to create a new instance with different languages
+        if (targetLanguage && targetLanguage !== config.targetLanguage) {
+          instance = await self.Translator.create({
+            sourceLanguage: config.sourceLanguage,
+            targetLanguage: targetLanguage
+          });
+        } else {
+          instance = translatorInstance || await initAI(taskType);
+        }
+        break;
     }
 
-    if (!writerInstance) {
-      const writer = await initWriter(taskType);
-      if (!writer) return;
-    }
+    if (!instance) return;
 
     showLoadingUI('Generating content...');
-
-    // Use streaming for better UX
-    const stream = writerInstance.writeStreaming(fullPrompt);
 
     let result = '';
     showResultUI(''); // Show empty result box
 
-    for await (const chunk of stream) {
-      result += chunk;
+    // Process based on API type
+    if (apiType === 'summarizer') {
+      const stream = instance.summarizeStreaming(text);
+      for await (const chunk of stream) {
+        result += chunk;
+        updateResultUI(result);
+      }
+    } else if (apiType === 'rewriter') {
+      const stream = instance.rewriteStreaming(text);
+      for await (const chunk of stream) {
+        result += chunk;
+        updateResultUI(result);
+      }
+    } else if (apiType === 'writer') {
+      let prompt;
+      if (taskType === 'custom' && customPrompt) {
+        prompt = customPrompt + ' ' + text;
+      } else {
+        prompt = text;
+      }
+      const stream = instance.writeStreaming(prompt);
+      for await (const chunk of stream) {
+        result += chunk;
+        updateResultUI(result);
+      }
+    } else if (apiType === 'translator') {
+      result = await instance.translate(text);
       updateResultUI(result);
     }
 
-    console.log('Writing complete:', result);
+    console.log('Processing complete:', result);
   } catch (error) {
     console.error('Error processing text:', error);
     showError('Failed to generate content: ' + error.message);
@@ -410,7 +565,7 @@ function showCustomPromptDialog(text) {
     const customPrompt = input.value.trim();
     if (customPrompt) {
       dialogDiv.remove();
-      processWithWriter(text, 'custom', customPrompt);
+      processWithAI(text, 'custom', customPrompt);
     } else {
       input.focus();
       input.style.borderColor = '#ef4444';
@@ -475,10 +630,21 @@ function resetChat() {
     // Clear any pending custom tasks
     window.pendingCustomTask = null;
 
-    // Destroy and recreate writer instance to reset context
+    // Destroy and recreate AI instances to reset context
     if (writerInstance) {
       writerInstance.destroy();
       writerInstance = null;
+    }
+    if (summarizerInstance) {
+      summarizerInstance.destroy();
+      summarizerInstance = null;
+    }
+    if (rewriterInstance) {
+      rewriterInstance.destroy();
+      rewriterInstance = null;
+    }
+    if (translatorInstance) {
+      translatorInstance = null; // Translator doesn't have destroy method
     }
 
     // Show a brief success indicator
@@ -870,12 +1036,12 @@ async function sendChatMessage(message) {
   // Scroll to bottom
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-  // Check if writer is available
-  const available = await checkWriterAvailability();
+  // Check if AI is available
+  const available = await checkAIAvailability();
   if (!available) {
     const errorMsg = document.createElement('div');
     errorMsg.className = 'ai-writer-chat-message assistant';
-    errorMsg.textContent = 'Sorry, the Writer API is not available on this device. Please check system requirements.';
+    errorMsg.textContent = 'Sorry, the AI APIs are not available on this device. Please check system requirements.';
     errorMsg.style.color = '#ef4444';
     messagesContainer.appendChild(errorMsg);
     return;
@@ -883,7 +1049,7 @@ async function sendChatMessage(message) {
 
   // Initialize writer if needed
   if (!writerInstance) {
-    await initWriter('custom');
+    await initAI('custom');
   }
 
   // Add assistant message wrapper
@@ -1104,7 +1270,7 @@ let lastTaskType = '';
 
 function regenerateContent() {
   if (lastText && lastTaskType) {
-    processWithWriter(lastText, lastTaskType);
+    processWithAI(lastText, lastTaskType);
   }
 }
 
@@ -1151,6 +1317,122 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Show translate language selection dialog
+async function showTranslateDialog(text, taskType, messageWrapper, assistantMsg, messagesContainer) {
+  // Common languages for translation
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'it', name: 'Italian' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'ru', name: 'Russian' }
+  ];
+
+  assistantMsg.innerHTML = `
+    <p>Select target language for translation:</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
+      ${languages.map(lang => `
+        <button class="translate-lang-btn" data-lang="${lang.code}" style="
+          padding: 6px 12px;
+          background: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+        ">${lang.name}</button>
+      `).join('')}
+    </div>
+  `;
+
+  // Add click handlers for language buttons
+  const langButtons = assistantMsg.querySelectorAll('.translate-lang-btn');
+  langButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const targetLang = btn.dataset.lang;
+
+      // Update message to show translating
+      assistantMsg.innerHTML = `<p style="opacity: 0.7;">Translating to ${btn.textContent}...</p>`;
+
+      try {
+        let sourceLang = 'en'; // Default source language
+
+        // Use Language Detector API to auto-detect source language
+        if ('LanguageDetector' in self) {
+          try {
+            assistantMsg.innerHTML = `<p style="opacity: 0.7;">Detecting language...</p>`;
+
+            const detector = await self.LanguageDetector.create({
+              monitor(m) {
+                m.addEventListener('downloadprogress', (e) => {
+                  const percent = Math.round(e.loaded * 100);
+                  assistantMsg.innerHTML = `<p style="opacity: 0.7;">Downloading language detector: ${percent}%</p>`;
+                });
+              }
+            });
+
+            const detectionResults = await detector.detect(text);
+            if (detectionResults && detectionResults.length > 0) {
+              sourceLang = detectionResults[0].detectedLanguage;
+              console.log(`Detected source language: ${sourceLang} (confidence: ${detectionResults[0].confidence})`);
+            }
+          } catch (detectionError) {
+            console.warn('Language detection failed, using default:', detectionError);
+            // Fall back to default 'en' if detection fails
+          }
+        }
+
+        // Check if translation is possible
+        const canTranslate = await self.Translator.availability({
+          sourceLanguage: sourceLang,
+          targetLanguage: targetLang
+        });
+
+        if (canTranslate === 'no') {
+          assistantMsg.textContent = `Translation from ${sourceLang} to ${btn.textContent} is not supported on this device.`;
+          assistantMsg.style.color = '#ef4444';
+          return;
+        }
+
+        // Update message to show translating
+        assistantMsg.innerHTML = `<p style="opacity: 0.7;">Translating from ${sourceLang} to ${btn.textContent}...</p>`;
+
+        // Create translator instance
+        const translator = await self.Translator.create({
+          sourceLanguage: sourceLang,
+          targetLanguage: targetLang,
+          monitor(m) {
+            m.addEventListener('downloadprogress', (e) => {
+              const percent = Math.round(e.loaded * 100);
+              assistantMsg.innerHTML = `<p style="opacity: 0.7;">Downloading translation model: ${percent}%</p>`;
+            });
+          }
+        });
+
+        const result = await translator.translate(text);
+        assistantMsg.innerHTML = formatMarkdown(result);
+
+        // Add action buttons after translation completes
+        addMessageActions(messageWrapper, assistantMsg);
+
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        assistantMsg.textContent = 'Translation failed: ' + error.message;
+        assistantMsg.style.color = '#ef4444';
+      }
+    });
+  });
+
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
 // Process text task in chat
 async function processTaskInChat(text, taskType) {
   // Ensure chat is open
@@ -1176,6 +1458,8 @@ async function processTaskInChat(text, taskType) {
   const taskNames = {
     'rephrase': '✏️ Rephrase',
     'summarize': '📋 Summarize',
+    'write': '✍️ Write',
+    'translate': '🌐 Translate',
     'custom': '✨ Custom Task'
   };
 
@@ -1193,20 +1477,28 @@ async function processTaskInChat(text, taskType) {
   // Scroll to bottom
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-  // Check if writer is available
-  const available = await checkWriterAvailability();
+  // Check if AI is available
+  const available = await checkAIAvailability();
   if (!available) {
     const errorMsg = document.createElement('div');
     errorMsg.className = 'ai-writer-chat-message assistant';
-    errorMsg.textContent = 'Sorry, the Writer API is not available on this device. Please check system requirements.';
+    errorMsg.textContent = 'Sorry, the AI APIs are not available on this device. Please check system requirements.';
     errorMsg.style.color = '#ef4444';
     messagesContainer.appendChild(errorMsg);
     return;
   }
 
-  // Initialize writer if needed
-  if (!writerInstance) {
-    await initWriter(taskType);
+  // Initialize AI if needed
+  const apiType = config.apiType;
+
+  if (apiType === 'summarizer' && !summarizerInstance) {
+    await initAI(taskType);
+  } else if (apiType === 'rewriter' && !rewriterInstance) {
+    await initAI(taskType);
+  } else if (apiType === 'writer' && !writerInstance) {
+    await initAI(taskType);
+  } else if (apiType === 'translator' && !translatorInstance) {
+    await initAI(taskType);
   }
 
   // For custom tasks, ask for the prompt in chat
@@ -1233,18 +1525,36 @@ async function processTaskInChat(text, taskType) {
   messageWrapper.appendChild(assistantMsg);
   messagesContainer.appendChild(messageWrapper);
 
-  // Build the prompt
-  const fullPrompt = config.prompt + text;
-
   try {
-    // Stream the response
-    const stream = writerInstance.writeStreaming(fullPrompt);
     let result = '';
+    const apiType = config.apiType;
 
-    for await (const chunk of stream) {
-      result += chunk;
-      assistantMsg.innerHTML = formatMarkdown(result);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Stream the response based on API type
+    if (apiType === 'summarizer') {
+      const stream = summarizerInstance.summarizeStreaming(text);
+      for await (const chunk of stream) {
+        result += chunk;
+        assistantMsg.innerHTML = formatMarkdown(result);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } else if (apiType === 'rewriter') {
+      const stream = rewriterInstance.rewriteStreaming(text);
+      for await (const chunk of stream) {
+        result += chunk;
+        assistantMsg.innerHTML = formatMarkdown(result);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } else if (apiType === 'writer') {
+      const stream = writerInstance.writeStreaming(text);
+      for await (const chunk of stream) {
+        result += chunk;
+        assistantMsg.innerHTML = formatMarkdown(result);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } else if (apiType === 'translator') {
+      // For translator, show a language selection dialog first
+      showTranslateDialog(text, taskType, messageWrapper, assistantMsg, messagesContainer);
+      return; // Exit early as dialog will handle the rest
     }
 
     console.log(result);
@@ -1270,9 +1580,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Initialize
-checkWriterAvailability().then(available => {
-  isWriterAvailable = available;
-  console.log('AI Writing Assistant loaded. Writer API available:', available);
+checkAIAvailability().then(available => {
+  isAIAvailable = available;
+  console.log('AI Writing Assistant loaded. AI APIs available:', available);
 
   // Show floating chat button on page load
   setTimeout(() => {
@@ -1285,4 +1595,11 @@ window.addEventListener('beforeunload', () => {
   if (writerInstance) {
     writerInstance.destroy();
   }
+  if (summarizerInstance) {
+    summarizerInstance.destroy();
+  }
+  if (rewriterInstance) {
+    rewriterInstance.destroy();
+  }
+  // Translator doesn't need cleanup
 });

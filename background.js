@@ -24,6 +24,20 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   chrome.contextMenus.create({
+    id: 'write-write',
+    parentId: 'ai-writer-menu',
+    title: '✍️ Write',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'write-translate',
+    parentId: 'ai-writer-menu',
+    title: '🌐 Translate',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
     id: 'ai-writer-separator-1',
     parentId: 'ai-writer-menu',
     type: 'separator',
