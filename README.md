@@ -2,6 +2,42 @@
 
 A powerful Chrome extension that leverages Chrome's Built-in AI APIs (Writer, Rewriter, Summarizer, Translator, and Language Detector) to enhance your writing experience. Features an interactive chat interface with page context awareness and support for both webpages and PDF documents.
 
+## Installation
+
+### Method 1: Load Unpacked Extension (Development)
+
+1. **Clone or download this repository**
+   ```bash
+   git clone <repository-url>
+   cd chromini
+   ```
+
+2. **Open Chrome Extensions page**
+   - Navigate to `chrome://extensions/`
+   - Or click Menu → Extensions → Manage Extensions
+
+3. **Enable Developer Mode**
+   - Toggle the "Developer mode" switch in the top-right corner
+
+4. **Load the extension**
+   - Click "Load unpacked"
+   - Select the `chromini` folder (the one containing `manifest.json`)
+
+5. **Verify installation**
+   - You should see "AI Writing Assistant" in your extensions list
+   - Click the extension icon to check API availability
+
+### Method 2: Create Icons (Optional)
+
+If you want custom icons instead of placeholders:
+
+```bash
+# Using the provided Python script
+python3 create_icons.py
+
+# Or see icons/ICONS_README.md for other methods
+```
+
 ## Features
 
 ### 🎯 Core AI Capabilities
@@ -79,42 +115,6 @@ if ('Translator' in self) {
   });
   console.log('Translator API:', availability);
 }
-```
-
-## Installation
-
-### Method 1: Load Unpacked Extension (Development)
-
-1. **Clone or download this repository**
-   ```bash
-   git clone <repository-url>
-   cd chromini
-   ```
-
-2. **Open Chrome Extensions page**
-   - Navigate to `chrome://extensions/`
-   - Or click Menu → Extensions → Manage Extensions
-
-3. **Enable Developer Mode**
-   - Toggle the "Developer mode" switch in the top-right corner
-
-4. **Load the extension**
-   - Click "Load unpacked"
-   - Select the `chromini` folder (the one containing `manifest.json`)
-
-5. **Verify installation**
-   - You should see "AI Writing Assistant" in your extensions list
-   - Click the extension icon to check API availability
-
-### Method 2: Create Icons (Optional)
-
-If you want custom icons instead of placeholders:
-
-```bash
-# Using the provided Python script
-python3 create_icons.py
-
-# Or see icons/ICONS_README.md for other methods
 ```
 
 ## How to Use
