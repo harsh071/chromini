@@ -5,6 +5,7 @@ let summarizerInstance = null;
 let rewriterInstance = null;
 let writerInstance = null;
 let translatorInstance = null;
+let promptInstance = null;
 let isAIAvailable = false;
 let pageContext = null;
 let pageContextEnabled = true;
@@ -133,7 +134,8 @@ async function checkAIAvailability() {
       summarizer: false,
       rewriter: false,
       writer: false,
-      translator: false
+      translator: false,
+      prompt: false
     };
 
     // Check Summarizer API
@@ -167,8 +169,15 @@ async function checkAIAvailability() {
       console.log('Translator API availability:', translatorAvailability);
     }
 
+    // Check Prompt API
+    if ('LanguageModel' in self) {
+      const promptAvailability = await self.LanguageModel.availability();
+      capabilities.prompt = promptAvailability !== 'no';
+      console.log('Prompt API availability:', promptAvailability);
+    }
+
     console.log('AI capabilities:', capabilities);
-    return capabilities.summarizer || capabilities.rewriter || capabilities.writer || capabilities.translator;
+    return capabilities.summarizer || capabilities.rewriter || capabilities.writer || capabilities.translator || capabilities.prompt;
   } catch (error) {
     console.error('Error checking AI availability:', error);
     return false;
@@ -631,6 +640,10 @@ function resetChat() {
     window.pendingCustomTask = null;
 
     // Destroy and recreate AI instances to reset context
+    if (promptInstance) {
+      promptInstance.destroy();
+      promptInstance = null;
+    }
     if (writerInstance) {
       writerInstance.destroy();
       writerInstance = null;
@@ -1017,6 +1030,60 @@ function insertMessageText(messageElement, button) {
   }
 }
 
+// Initialize Prompt API
+async function initPromptAPI() {
+  if (promptInstance) {
+    return promptInstance;
+  }
+
+  const messagesContainer = document.getElementById('chat-messages');
+  let loadingMsg = null;
+
+  if (messagesContainer) {
+    loadingMsg = document.createElement('div');
+    loadingMsg.className = 'ai-writer-chat-message assistant loading-message';
+    loadingMsg.textContent = 'Initializing Prompt API...';
+    messagesContainer.appendChild(loadingMsg);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  try {
+    // Get page context for system prompt
+    const context = pageContextEnabled ? await getPageContext() : null;
+
+    let systemPrompt = 'You are a helpful AI assistant integrated into a web browser extension. Answer questions clearly and concisely.';
+
+    if (context && context.length > 50) {
+      systemPrompt += `\n\nYou have access to the following page content that the user is currently viewing:\n\n${context}\n\nUse this context to answer questions about the page when relevant.`;
+    }
+
+    promptInstance = await self.LanguageModel.create({
+      systemPrompt: systemPrompt,
+      monitor(m) {
+        m.addEventListener('downloadprogress', (e) => {
+          const percent = Math.round(e.loaded * 100);
+          if (loadingMsg) {
+            loadingMsg.textContent = `Downloading language model: ${percent}%`;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+        });
+      }
+    });
+
+    if (loadingMsg) {
+      loadingMsg.remove();
+    }
+
+    return promptInstance;
+  } catch (error) {
+    console.error('Error initializing Prompt API:', error);
+    if (loadingMsg) {
+      loadingMsg.remove();
+    }
+    throw error;
+  }
+}
+
 // Send chat message
 async function sendChatMessage(message) {
   const messagesContainer = document.getElementById('chat-messages');
@@ -1047,11 +1114,6 @@ async function sendChatMessage(message) {
     return;
   }
 
-  // Initialize writer if needed
-  if (!writerInstance) {
-    await initAI('custom');
-  }
-
   // Add assistant message wrapper
   const messageWrapper = document.createElement('div');
   messageWrapper.className = 'ai-writer-message-wrapper assistant-wrapper';
@@ -1065,15 +1127,71 @@ async function sendChatMessage(message) {
 
   try {
     let finalPrompt = message;
+    let forcePromptAPI = false;
 
     // Check if there's a pending custom task
     if (window.pendingCustomTask) {
-      const { text } = window.pendingCustomTask;
-      finalPrompt = message + ' ' + text;
+      const { text, usePromptAPI } = window.pendingCustomTask;
+      forcePromptAPI = usePromptAPI;
+
+      if (usePromptAPI) {
+        // For Prompt API, use a more structured format
+        finalPrompt = `${message}\n\nText to process:\n${text}`;
+      } else {
+        // For Writer API, use the old format
+        finalPrompt = message + ' ' + text;
+      }
+
       window.pendingCustomTask = null; // Clear it after use
     }
+
+    // Try to use Prompt API first (preferred for chat)
+    if ('LanguageModel' in self) {
+      try {
+        const availability = await self.LanguageModel.availability();
+
+        if (availability !== 'no' || forcePromptAPI) {
+          // Initialize Prompt API if needed
+          if (!promptInstance) {
+            await initPromptAPI();
+          }
+
+          // Update badge to show context was used
+          if (pageContextEnabled && !window.pendingCustomTask) {
+            const badge = document.querySelector('.ai-context-badge');
+            if (badge) {
+              badge.classList.add('active');
+              setTimeout(() => badge.classList.remove('active'), 2000);
+            }
+          }
+
+          // Stream the response using Prompt API
+          const stream = promptInstance.promptStreaming(finalPrompt);
+          let result = '';
+
+          for await (const chunk of stream) {
+            result += chunk;
+            assistantMsg.innerHTML = formatMarkdown(result);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+
+          // Add action buttons after streaming completes
+          addMessageActions(messageWrapper, assistantMsg);
+          return;
+        }
+      } catch (promptError) {
+        console.warn('Prompt API failed, falling back to Writer API:', promptError);
+        // Fall through to Writer API fallback
+      }
+    }
+
+    // Fallback to Writer API if Prompt API is not available
+    if (!writerInstance) {
+      await initAI('custom');
+    }
+
     // Include page context if enabled and no pending task
-    else if (pageContextEnabled) {
+    if (pageContextEnabled && !window.pendingCustomTask) {
       const context = await getPageContext();
       if (context && context.length > 50) {
         // Only include context if it's substantial
@@ -1088,7 +1206,7 @@ async function sendChatMessage(message) {
       }
     }
 
-    // Stream the response
+    // Stream the response using Writer API
     const stream = writerInstance.writeStreaming(finalPrompt);
     let result = '';
 
@@ -1098,7 +1216,7 @@ async function sendChatMessage(message) {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    console.log(result)
+    console.log(result);
 
     // Add action buttons after streaming completes
     addMessageActions(messageWrapper, assistantMsg);
@@ -1503,6 +1621,27 @@ async function processTaskInChat(text, taskType) {
 
   // For custom tasks, ask for the prompt in chat
   if (taskType === 'custom') {
+    // Try to use Prompt API for custom tasks
+    if ('LanguageModel' in self) {
+      try {
+        const availability = await self.LanguageModel.availability();
+        if (availability !== 'no') {
+          const promptMsg = document.createElement('div');
+          promptMsg.className = 'ai-writer-chat-message assistant';
+          promptMsg.textContent = 'What would you like me to do with this text?';
+          messagesContainer.appendChild(promptMsg);
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+          // Store context for the next user message with Prompt API flag
+          window.pendingCustomTask = { text, taskType, usePromptAPI: true };
+          return;
+        }
+      } catch (error) {
+        console.warn('Prompt API check failed, using Writer API:', error);
+      }
+    }
+
+    // Fallback to Writer API
     const promptMsg = document.createElement('div');
     promptMsg.className = 'ai-writer-chat-message assistant';
     promptMsg.textContent = 'What would you like me to do with this text?';
@@ -1510,7 +1649,7 @@ async function processTaskInChat(text, taskType) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     // Store context for the next user message
-    window.pendingCustomTask = { text, taskType };
+    window.pendingCustomTask = { text, taskType, usePromptAPI: false };
     return;
   }
 
@@ -1592,6 +1731,9 @@ checkAIAvailability().then(available => {
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
+  if (promptInstance) {
+    promptInstance.destroy();
+  }
   if (writerInstance) {
     writerInstance.destroy();
   }
